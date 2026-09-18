@@ -102,3 +102,21 @@ def test_invalid_bit_depth_rejected():
 def test_fixed_palette_mode_requires_a_name():
     with pytest.raises(ValueError):
         BitmapFilterConfig(palette_mode="fixed", fixed_palette=None)
+
+
+def test_scanlines_darken_alternate_output_rows():
+    config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=8, scanlines=0.0)
+    plain = apply_bitmap_filter(_random_image(), config)
+
+    scanlined_config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=8, scanlines=1.0)
+    scanlined = apply_bitmap_filter(_random_image(), scanlined_config)
+
+    np.testing.assert_array_equal(scanlined.output[1::2], 0)
+    np.testing.assert_array_equal(scanlined.output[0::2], plain.output[0::2])
+
+
+def test_invalid_scanlines_rejected():
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(scanlines=-0.1)
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(scanlines=1.1)

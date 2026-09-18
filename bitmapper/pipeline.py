@@ -11,6 +11,7 @@ from . import palette_gen
 from . import palettes
 from .dither import apply as apply_dither
 from .dither import list_methods as list_dither_methods
+from .effects import apply_scanlines
 
 MIN_BIT_DEPTH = 1
 MAX_BIT_DEPTH = 24  # 2**24 = 16.7M colors: full precision for 8-bit-per-channel RGB
@@ -32,6 +33,7 @@ class BitmapFilterConfig:
     palette_algorithm: str = "median_cut"  # "median_cut" | "kmeans"
     fixed_palette: str | None = None
     dither: str = "none"  # see bitmapper.dither.list_methods()
+    scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
 
     def __post_init__(self) -> None:
         if not (MIN_BIT_DEPTH <= self.bit_depth <= MAX_BIT_DEPTH):
@@ -44,6 +46,8 @@ class BitmapFilterConfig:
             raise ValueError(f"invalid palette_mode: {self.palette_mode!r}")
         if self.dither not in list_dither_methods():
             raise ValueError(f"invalid dither: {self.dither!r}")
+        if not (0.0 <= self.scanlines <= 1.0):
+            raise ValueError(f"scanlines must be between 0 and 1, got {self.scanlines}")
         if self.palette_mode == "fixed" and not self.fixed_palette:
             raise ValueError("fixed_palette must be set when palette_mode='fixed'")
 
@@ -87,4 +91,6 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
         quantized_grid = apply_dither(grid_colors, palette, config.dither)
 
     output = gridmod.upscale(quantized_grid, config.output_size)
+    if config.scanlines > 0.0:
+        output = apply_scanlines(output, config.scanlines)
     return FilterResult(output=output, grid=quantized_grid, palette=palette)
