@@ -30,9 +30,10 @@ class BitmapFilterConfig:
     grid_size: tuple[int, int] = (200, 200)  # (cols, rows)
     bit_depth: int = 8
     block_sampling: str = "average"  # "average" | "nearest"
-    palette_mode: str = "auto"  # "auto" | "fixed"
+    palette_mode: str = "auto"  # "auto" | "fixed" | "custom"
     palette_algorithm: str = "median_cut"  # "median_cut" | "kmeans"
     fixed_palette: str | None = None
+    custom_palette: np.ndarray | list[tuple[int, int, int]] | None = None
     dither: str = "none"  # see bitmapper.dither.list_methods()
     dither_strength: float = 1.0  # 0 = no dithering pattern, 1 = full strength
     scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
@@ -49,7 +50,7 @@ class BitmapFilterConfig:
             )
         if self.block_sampling not in ("average", "nearest"):
             raise ValueError(f"invalid block_sampling: {self.block_sampling!r}")
-        if self.palette_mode not in ("auto", "fixed"):
+        if self.palette_mode not in ("auto", "fixed", "custom"):
             raise ValueError(f"invalid palette_mode: {self.palette_mode!r}")
         if self.dither not in list_dither_methods():
             raise ValueError(f"invalid dither: {self.dither!r}")
@@ -67,6 +68,12 @@ class BitmapFilterConfig:
             raise ValueError(f"gamma must be > 0, got {self.gamma}")
         if self.palette_mode == "fixed" and not self.fixed_palette:
             raise ValueError("fixed_palette must be set when palette_mode='fixed'")
+        if self.palette_mode == "custom":
+            if self.custom_palette is None or len(self.custom_palette) == 0:
+                raise ValueError("custom_palette must be set when palette_mode='custom'")
+            arr = np.asarray(self.custom_palette)
+            if arr.ndim != 2 or arr.shape[1] != 3:
+                raise ValueError(f"custom_palette must be an (N, 3) array of RGB colors, got shape {arr.shape}")
 
     @property
     def n_colors(self) -> int:
@@ -100,6 +107,10 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
 
     if config.palette_mode == "fixed":
         palette = palettes.subsample(palettes.get_palette(config.fixed_palette), config.n_colors)
+        quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
+    elif config.palette_mode == "custom":
+        custom_palette = np.asarray(config.custom_palette, dtype=np.uint8)
+        palette = palettes.subsample(custom_palette, config.n_colors)
         quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
     elif config.bit_depth >= _TRUE_COLOR_THRESHOLD:
         palette = np.unique(grid_colors.reshape(-1, 3), axis=0)

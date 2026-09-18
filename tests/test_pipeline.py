@@ -203,3 +203,38 @@ def test_zero_dither_strength_matches_no_dither():
 def test_invalid_dither_strength_rejected():
     with pytest.raises(ValueError):
         BitmapFilterConfig(dither_strength=-0.5)
+
+
+def test_custom_palette_pipeline_uses_only_custom_colors():
+    custom = [(10, 20, 30), (200, 100, 50), (0, 255, 0)]
+    config = BitmapFilterConfig(
+        output_size=(40, 40), grid_size=(8, 8), bit_depth=4,
+        palette_mode="custom", custom_palette=custom, dither="floyd_steinberg",
+    )
+    result = apply_bitmap_filter(_random_image(), config)
+
+    custom_set = {tuple(c) for c in custom}
+    used_colors = {tuple(c) for c in result.output.reshape(-1, 3)}
+    assert used_colors.issubset(custom_set)
+
+
+def test_custom_palette_subsampled_to_bit_depth_budget():
+    custom = [(i, i, i) for i in range(0, 256, 16)]  # 16 grayscale entries
+    config = BitmapFilterConfig(
+        output_size=(40, 40), grid_size=(8, 8), bit_depth=3,  # budget of 8
+        palette_mode="custom", custom_palette=custom,
+    )
+    result = apply_bitmap_filter(_random_image(), config)
+    assert len(result.palette) == 8
+
+
+def test_custom_palette_mode_requires_a_palette():
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(palette_mode="custom", custom_palette=None)
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(palette_mode="custom", custom_palette=[])
+
+
+def test_custom_palette_rejects_wrong_shape():
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(palette_mode="custom", custom_palette=[(1, 2), (3, 4)])
