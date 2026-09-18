@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from bitmapper.dither import list_methods as list_dither_methods
 from bitmapper.pipeline import BitmapFilterConfig, apply_bitmap_filter
 
 
@@ -21,7 +22,7 @@ def _assert_blocky(output, grid_size, output_size):
 
 
 @pytest.mark.parametrize("bit_depth", [2, 4, 8])
-@pytest.mark.parametrize("dither", ["none", "floyd_steinberg", "ordered"])
+@pytest.mark.parametrize("dither", list_dither_methods())
 def test_auto_palette_pipeline_produces_blocky_output_within_color_budget(bit_depth, dither):
     config = BitmapFilterConfig(
         output_size=(40, 40),
@@ -60,7 +61,7 @@ def test_true_color_bit_depth_skips_dithering_and_passes_through():
     config = BitmapFilterConfig(
         output_size=(40, 40),
         grid_size=(8, 8),
-        bit_depth=32,
+        bit_depth=24,
         palette_mode="auto",
         dither="floyd_steinberg",  # should be ignored at true-color depth
     )
@@ -68,7 +69,7 @@ def test_true_color_bit_depth_skips_dithering_and_passes_through():
 
     direct_grid = apply_bitmap_filter(
         _random_image(),
-        BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=32),
+        BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=24),
     ).grid
     np.testing.assert_array_equal(result.grid, direct_grid)
 
@@ -93,7 +94,9 @@ def test_rgba_input_is_handled():
 
 def test_invalid_bit_depth_rejected():
     with pytest.raises(ValueError):
-        BitmapFilterConfig(bit_depth=7)
+        BitmapFilterConfig(bit_depth=0)
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(bit_depth=25)
 
 
 def test_fixed_palette_mode_requires_a_name():

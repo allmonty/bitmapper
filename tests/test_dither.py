@@ -1,9 +1,30 @@
 import numpy as np
 import pytest
 
-from bitmapper.dither import apply, floyd_steinberg, ordered
+from bitmapper.dither import (
+    apply,
+    floyd_steinberg,
+    list_methods,
+    ordered,
+    ordered_2x2,
+    ordered_8x8,
+    random_dither,
+)
 
 PALETTE = np.array([[0, 0, 0], [255, 255, 255]], dtype=np.uint8)
+
+# Error-diffusion methods that share the generic _error_diffusion helper.
+DIFFUSION_METHODS = [
+    "floyd_steinberg",
+    "atkinson",
+    "jarvis_judice_ninke",
+    "stucki",
+    "sierra",
+    "sierra_lite",
+    "burkes",
+]
+ORDERED_METHODS = ["ordered", "ordered_2x2", "ordered_8x8"]
+ALL_METHODS = DIFFUSION_METHODS + ORDERED_METHODS + ["random"]
 
 
 def _assert_only_palette_colors(image, palette):
@@ -12,29 +33,65 @@ def _assert_only_palette_colors(image, palette):
     assert all(tuple(c) in palette_set for c in flat)
 
 
-def test_floyd_steinberg_only_uses_palette_colors(gradient_image):
-    out = floyd_steinberg(gradient_image, PALETTE)
+def test_list_methods_includes_none_and_is_sorted_otherwise():
+    methods = list_methods()
+    assert methods[0] == "none"
+    assert set(methods) == {"none", *ALL_METHODS}
+    assert methods[1:] == sorted(methods[1:])
+
+
+@pytest.mark.parametrize("method", ALL_METHODS)
+def test_apply_only_uses_palette_colors(gradient_image, method):
+    out = apply(gradient_image, PALETTE, method)
     assert out.shape == gradient_image.shape
+    assert out.dtype == np.uint8
     _assert_only_palette_colors(out, PALETTE)
 
 
-def test_floyd_steinberg_preserves_overall_brightness_roughly(gradient_image):
-    out = floyd_steinberg(gradient_image, PALETTE)
+@pytest.mark.parametrize("method", DIFFUSION_METHODS)
+def test_diffusion_preserves_overall_brightness_roughly(gradient_image, method):
+    out = apply(gradient_image, PALETTE, method)
     original_mean = gradient_image.astype(np.float64).mean()
     out_mean = out.astype(np.float64).mean()
     assert abs(original_mean - out_mean) < 40  # loose bound, error diffusion is approximate
 
 
-def test_ordered_only_uses_palette_colors(gradient_image):
-    out = ordered(gradient_image, PALETTE)
-    assert out.shape == gradient_image.shape
-    _assert_only_palette_colors(out, PALETTE)
+def test_floyd_steinberg_matches_apply_dispatch(gradient_image):
+    assert np.array_equal(floyd_steinberg(gradient_image, PALETTE), apply(gradient_image, PALETTE, "floyd_steinberg"))
+
+
+def test_ordered_matches_apply_dispatch(gradient_image):
+    assert np.array_equal(ordered(gradient_image, PALETTE), apply(gradient_image, PALETTE, "ordered"))
+
+
+def test_ordered_default_matrix_size_is_4x4(gradient_image):
+    assert np.array_equal(ordered(gradient_image, PALETTE), ordered(gradient_image, PALETTE, matrix_size=4))
+
+
+def test_ordered_matrix_sizes_differ(gradient_image):
+    o2 = ordered_2x2(gradient_image, PALETTE)
+    o4 = ordered(gradient_image, PALETTE)
+    o8 = ordered_8x8(gradient_image, PALETTE)
+    assert not np.array_equal(o2, o4)
+    assert not np.array_equal(o4, o8)
 
 
 def test_ordered_and_floyd_steinberg_differ_on_gradient(gradient_image):
     fs = floyd_steinberg(gradient_image, PALETTE)
     od = ordered(gradient_image, PALETTE)
     assert not np.array_equal(fs, od)
+
+
+def test_random_dither_is_deterministic_with_seed(gradient_image):
+    a = random_dither(gradient_image, PALETTE, seed=42)
+    b = random_dither(gradient_image, PALETTE, seed=42)
+    assert np.array_equal(a, b)
+
+
+def test_random_dither_varies_with_seed(gradient_image):
+    a = random_dither(gradient_image, PALETTE, seed=1)
+    b = random_dither(gradient_image, PALETTE, seed=2)
+    assert not np.array_equal(a, b)
 
 
 def test_apply_none_is_plain_nearest_color(gradient_image):

@@ -10,9 +10,11 @@ from . import grid as gridmod
 from . import palette_gen
 from . import palettes
 from .dither import apply as apply_dither
+from .dither import list_methods as list_dither_methods
 
-VALID_BIT_DEPTHS = (2, 4, 8, 16, 32)
-# 16/32-bit color is effectively "true color" for a photo — generating and
+MIN_BIT_DEPTH = 1
+MAX_BIT_DEPTH = 24  # 2**24 = 16.7M colors: full precision for 8-bit-per-channel RGB
+# 16+ bit color is effectively "true color" for a photo — generating and
 # dithering onto a palette of 65536+ colors from a small grid is both
 # pointless (the grid rarely has that many unique colors) and expensive, so
 # those depths skip palette generation/dithering and pass the block-sampled
@@ -29,16 +31,18 @@ class BitmapFilterConfig:
     palette_mode: str = "auto"  # "auto" | "fixed"
     palette_algorithm: str = "median_cut"  # "median_cut" | "kmeans"
     fixed_palette: str | None = None
-    dither: str = "none"  # "none" | "floyd_steinberg" | "ordered"
+    dither: str = "none"  # see bitmapper.dither.list_methods()
 
     def __post_init__(self) -> None:
-        if self.bit_depth not in VALID_BIT_DEPTHS:
-            raise ValueError(f"bit_depth must be one of {VALID_BIT_DEPTHS}, got {self.bit_depth}")
+        if not (MIN_BIT_DEPTH <= self.bit_depth <= MAX_BIT_DEPTH):
+            raise ValueError(
+                f"bit_depth must be between {MIN_BIT_DEPTH} and {MAX_BIT_DEPTH}, got {self.bit_depth}"
+            )
         if self.block_sampling not in ("average", "nearest"):
             raise ValueError(f"invalid block_sampling: {self.block_sampling!r}")
         if self.palette_mode not in ("auto", "fixed"):
             raise ValueError(f"invalid palette_mode: {self.palette_mode!r}")
-        if self.dither not in ("none", "floyd_steinberg", "ordered"):
+        if self.dither not in list_dither_methods():
             raise ValueError(f"invalid dither: {self.dither!r}")
         if self.palette_mode == "fixed" and not self.fixed_palette:
             raise ValueError("fixed_palette must be set when palette_mode='fixed'")

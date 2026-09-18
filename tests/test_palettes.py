@@ -8,6 +8,9 @@ EXPECTED_SIZES = {
     "ega": 16,
     "gameboy": 4,
     "vga256": 256,
+    "c64": 16,
+    "zxspectrum": 16,
+    "pico8": 16,
 }
 
 
