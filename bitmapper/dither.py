@@ -66,6 +66,7 @@ def _error_diffusion(
     palette: np.ndarray,
     kernel: list[tuple[int, int, float]],
     divisor: float,
+    strength: float = 1.0,
 ) -> np.ndarray:
     img = image.astype(np.float64).copy()
     pal = palette.astype(np.float64)
@@ -82,51 +83,51 @@ def _error_diffusion(
             for dx, dy, weight in kernel:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < w and 0 <= ny < h:
-                    img[ny, nx] += error * weight / divisor
+                    img[ny, nx] += error * weight / divisor * strength
 
     return np.clip(img, 0, 255).astype(np.uint8)
 
 
-def floyd_steinberg(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+def floyd_steinberg(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Classic Floyd-Steinberg error-diffusion dithering onto ``palette``."""
     kernel, divisor = _DIFFUSION_KERNELS["floyd_steinberg"]
-    return _error_diffusion(image, palette, kernel, divisor)
+    return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
-def atkinson(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+def atkinson(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Atkinson error-diffusion dithering (classic Mac look)."""
     kernel, divisor = _DIFFUSION_KERNELS["atkinson"]
-    return _error_diffusion(image, palette, kernel, divisor)
+    return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
-def jarvis_judice_ninke(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+def jarvis_judice_ninke(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Jarvis-Judice-Ninke error-diffusion dithering (wide kernel, smooth)."""
     kernel, divisor = _DIFFUSION_KERNELS["jarvis_judice_ninke"]
-    return _error_diffusion(image, palette, kernel, divisor)
+    return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
-def stucki(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+def stucki(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Stucki error-diffusion dithering."""
     kernel, divisor = _DIFFUSION_KERNELS["stucki"]
-    return _error_diffusion(image, palette, kernel, divisor)
+    return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
-def sierra(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+def sierra(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Sierra error-diffusion dithering."""
     kernel, divisor = _DIFFUSION_KERNELS["sierra"]
-    return _error_diffusion(image, palette, kernel, divisor)
+    return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
-def sierra_lite(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+def sierra_lite(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Sierra Lite error-diffusion dithering (cheap, small kernel)."""
     kernel, divisor = _DIFFUSION_KERNELS["sierra_lite"]
-    return _error_diffusion(image, palette, kernel, divisor)
+    return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
-def burkes(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+def burkes(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
     """Burkes error-diffusion dithering."""
     kernel, divisor = _DIFFUSION_KERNELS["burkes"]
-    return _error_diffusion(image, palette, kernel, divisor)
+    return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
 def _bayer_matrix(size: int) -> np.ndarray:
@@ -144,7 +145,7 @@ def _bayer_matrix(size: int) -> np.ndarray:
     )
 
 
-def _ordered_with_matrix(image: np.ndarray, palette: np.ndarray, matrix: np.ndarray) -> np.ndarray:
+def _ordered_with_matrix(image: np.ndarray, palette: np.ndarray, matrix: np.ndarray, strength: float = 1.0) -> np.ndarray:
     size = matrix.shape[0]
     threshold = matrix / (size * size) - 0.5
     h, w = image.shape[:2]
@@ -153,28 +154,30 @@ def _ordered_with_matrix(image: np.ndarray, palette: np.ndarray, matrix: np.ndar
     n_colors = max(len(palette), 2)
     step = 255.0 / (n_colors ** (1 / 3))
 
-    perturbed = image.astype(np.float64) + tiled[..., None] * step
+    perturbed = image.astype(np.float64) + tiled[..., None] * step * strength
     quantized, _ = nearest_color(np.clip(perturbed, 0, 255), palette)
     return quantized
 
 
-def ordered(image: np.ndarray, palette: np.ndarray, matrix_size: int = 4) -> np.ndarray:
+def ordered(image: np.ndarray, palette: np.ndarray, matrix_size: int = 4, strength: float = 1.0) -> np.ndarray:
     """Ordered (Bayer) dithering: perturb pixels by a tiled threshold map,
     scaled to roughly the palette's color spacing, before nearest-color
     quantization. ``matrix_size`` must be a power of two (2, 4, 8, ...).
     """
-    return _ordered_with_matrix(image, palette, _bayer_matrix(matrix_size))
+    return _ordered_with_matrix(image, palette, _bayer_matrix(matrix_size), strength)
 
 
-def ordered_2x2(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
-    return ordered(image, palette, matrix_size=2)
+def ordered_2x2(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
+    return ordered(image, palette, matrix_size=2, strength=strength)
 
 
-def ordered_8x8(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
-    return ordered(image, palette, matrix_size=8)
+def ordered_8x8(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
+    return ordered(image, palette, matrix_size=8, strength=strength)
 
 
-def random_dither(image: np.ndarray, palette: np.ndarray, seed: int | None = None) -> np.ndarray:
+def random_dither(
+    image: np.ndarray, palette: np.ndarray, strength: float = 1.0, seed: int | None = None
+) -> np.ndarray:
     """White-noise dithering: perturb pixels with uniform random noise,
     scaled to roughly the palette's color spacing, before nearest-color
     quantization. Grungier and less structured than ordered dithering.
@@ -183,7 +186,7 @@ def random_dither(image: np.ndarray, palette: np.ndarray, seed: int | None = Non
     n_colors = max(len(palette), 2)
     step = 255.0 / (n_colors ** (1 / 3))
 
-    noise = rng.uniform(-0.5, 0.5, size=image.shape[:2]) * step
+    noise = rng.uniform(-0.5, 0.5, size=image.shape[:2]) * step * strength
     perturbed = image.astype(np.float64) + noise[..., None]
     quantized, _ = nearest_color(np.clip(perturbed, 0, 255), palette)
     return quantized
@@ -208,11 +211,17 @@ def list_methods() -> list[str]:
     return ["none"] + sorted(_METHODS.keys())
 
 
-def apply(image: np.ndarray, palette: np.ndarray, method: str) -> np.ndarray:
+def apply(image: np.ndarray, palette: np.ndarray, method: str, strength: float = 1.0) -> np.ndarray:
+    """Apply dither ``method`` onto ``palette``. ``strength`` (0-1) scales
+    how much dithering pattern is applied: 0 behaves like "none" (plain
+    nearest-color quantization), 1 is full-strength dithering.
+    """
+    if strength < 0:
+        raise ValueError(f"dither strength must be >= 0, got {strength}")
     if method == "none":
         quantized, _ = nearest_color(image, palette)
         return quantized
     try:
-        return _METHODS[method](image, palette)
+        return _METHODS[method](image, palette, strength=strength)
     except KeyError:
         raise ValueError(f"unknown dither method: {method!r}") from None

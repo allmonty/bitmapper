@@ -102,3 +102,27 @@ def test_apply_none_is_plain_nearest_color(gradient_image):
 def test_apply_rejects_unknown_method(gradient_image):
     with pytest.raises(ValueError):
         apply(gradient_image, PALETTE, "bogus")
+
+
+@pytest.mark.parametrize("method", ALL_METHODS)
+def test_zero_strength_matches_plain_nearest_color(gradient_image, method):
+    out = apply(gradient_image, PALETTE, method, strength=0.0)
+    none_out = apply(gradient_image, PALETTE, "none")
+    np.testing.assert_array_equal(out, none_out)
+
+
+# "random" isn't seeded by apply(), so two default calls aren't guaranteed
+# to match each other regardless of strength.
+DETERMINISTIC_METHODS = [m for m in ALL_METHODS if m != "random"]
+
+
+@pytest.mark.parametrize("method", DETERMINISTIC_METHODS)
+def test_full_strength_matches_default(gradient_image, method):
+    out = apply(gradient_image, PALETTE, method, strength=1.0)
+    default_out = apply(gradient_image, PALETTE, method)
+    np.testing.assert_array_equal(out, default_out)
+
+
+def test_apply_rejects_negative_strength(gradient_image):
+    with pytest.raises(ValueError):
+        apply(gradient_image, PALETTE, "floyd_steinberg", strength=-0.1)

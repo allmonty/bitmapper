@@ -34,6 +34,7 @@ class BitmapFilterConfig:
     palette_algorithm: str = "median_cut"  # "median_cut" | "kmeans"
     fixed_palette: str | None = None
     dither: str = "none"  # see bitmapper.dither.list_methods()
+    dither_strength: float = 1.0  # 0 = no dithering pattern, 1 = full strength
     scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
     grid_gap_px: int = 0  # gutter width between blocks, in output pixels
     grid_gap_color: tuple[int, int, int] = (0, 0, 0)
@@ -52,6 +53,8 @@ class BitmapFilterConfig:
             raise ValueError(f"invalid palette_mode: {self.palette_mode!r}")
         if self.dither not in list_dither_methods():
             raise ValueError(f"invalid dither: {self.dither!r}")
+        if self.dither_strength < 0:
+            raise ValueError(f"dither_strength must be >= 0, got {self.dither_strength}")
         if not (0.0 <= self.scanlines <= 1.0):
             raise ValueError(f"scanlines must be between 0 and 1, got {self.scanlines}")
         if self.grid_gap_px < 0:
@@ -97,13 +100,13 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
 
     if config.palette_mode == "fixed":
         palette = palettes.subsample(palettes.get_palette(config.fixed_palette), config.n_colors)
-        quantized_grid = apply_dither(grid_colors, palette, config.dither)
+        quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
     elif config.bit_depth >= _TRUE_COLOR_THRESHOLD:
         palette = np.unique(grid_colors.reshape(-1, 3), axis=0)
         quantized_grid = grid_colors
     else:
         palette = palette_gen.generate_palette(grid_colors, config.n_colors, config.palette_algorithm)
-        quantized_grid = apply_dither(grid_colors, palette, config.dither)
+        quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
 
     output = gridmod.upscale(
         quantized_grid, config.output_size, gap_px=config.grid_gap_px, gap_color=config.grid_gap_color

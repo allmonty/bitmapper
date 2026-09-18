@@ -183,3 +183,23 @@ def test_saturation_zero_produces_grayscale_output():
 def test_invalid_adjustments_rejected(kwargs):
     with pytest.raises(ValueError):
         BitmapFilterConfig(**kwargs)
+
+
+def test_zero_dither_strength_matches_no_dither():
+    plain_config = BitmapFilterConfig(
+        output_size=(40, 40), grid_size=(8, 8), bit_depth=4, palette_mode="fixed", fixed_palette="ega", dither="none",
+    )
+    plain = apply_bitmap_filter(_random_image(), plain_config)
+
+    zero_strength_config = BitmapFilterConfig(
+        output_size=(40, 40), grid_size=(8, 8), bit_depth=4, palette_mode="fixed", fixed_palette="ega",
+        dither="floyd_steinberg", dither_strength=0.0,
+    )
+    zero_strength = apply_bitmap_filter(_random_image(), zero_strength_config)
+
+    np.testing.assert_array_equal(plain.output, zero_strength.output)
+
+
+def test_invalid_dither_strength_rejected():
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(dither_strength=-0.5)
