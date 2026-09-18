@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from .quantize import nearest_index
+
 
 def _bucket_priority(bucket: np.ndarray) -> float:
     if len(bucket) <= 1:
@@ -70,8 +72,7 @@ def kmeans(pixels: np.ndarray, n_colors: int, iterations: int = 10, seed: int = 
     centers = unique_pixels[chosen].copy()
 
     for _ in range(iterations):
-        dists = ((flat[:, None, :] - centers[None, :, :]) ** 2).sum(axis=2)
-        labels = dists.argmin(axis=1)
+        labels = nearest_index(flat, centers)
         new_centers = centers.copy()
         for i in range(k):
             mask = labels == i

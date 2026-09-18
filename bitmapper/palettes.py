@@ -166,21 +166,26 @@ def _vga256() -> np.ndarray:
     return np.vstack([cube, grayscale])
 
 
+# Register a palette by adding its RGB tuples here; the uint8 conversion is
+# applied once below, so entries can be plain lists or computed arrays.
 _PALETTES = {
-    "cga": np.array(_CGA, dtype=np.uint8),
-    "ega": np.array(_EGA, dtype=np.uint8),
-    "gameboy": np.array(_GAMEBOY, dtype=np.uint8),
-    "vga256": _vga256(),
-    "c64": np.array(_C64, dtype=np.uint8),
-    "zxspectrum": np.array(_ZX_SPECTRUM, dtype=np.uint8),
-    "pico8": np.array(_PICO8, dtype=np.uint8),
-    "nes": np.array(_NES, dtype=np.uint8),
-    "appleii": np.array(_APPLEII, dtype=np.uint8),
-    "msx": np.array(_MSX, dtype=np.uint8),
-    "teletext": np.array(_TELETEXT, dtype=np.uint8),
-    "monochrome_green": np.array(_MONOCHROME_GREEN, dtype=np.uint8),
-    "monochrome_amber": np.array(_MONOCHROME_AMBER, dtype=np.uint8),
-    "sepia": _sepia(),
+    name: np.asarray(colors, dtype=np.uint8)
+    for name, colors in {
+        "cga": _CGA,
+        "ega": _EGA,
+        "gameboy": _GAMEBOY,
+        "vga256": _vga256(),
+        "c64": _C64,
+        "zxspectrum": _ZX_SPECTRUM,
+        "pico8": _PICO8,
+        "nes": _NES,
+        "appleii": _APPLEII,
+        "msx": _MSX,
+        "teletext": _TELETEXT,
+        "monochrome_green": _MONOCHROME_GREEN,
+        "monochrome_amber": _MONOCHROME_AMBER,
+        "sepia": _sepia(),
+    }.items()
 }
 
 

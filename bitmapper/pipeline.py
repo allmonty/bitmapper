@@ -94,6 +94,20 @@ def _resize_to_canvas(image: np.ndarray, output_size: tuple[int, int]) -> np.nda
     return np.array(pil_img)
 
 
+def _resolve_palette(grid_colors: np.ndarray, config: BitmapFilterConfig) -> np.ndarray | None:
+    """The palette to quantize ``grid_colors`` onto, or ``None`` for the
+    true-color path (no palette, no dithering — colors pass through).
+    """
+    if config.palette_mode == "fixed":
+        return palettes.subsample(palettes.get_palette(config.fixed_palette), config.n_colors)
+    if config.palette_mode == "custom":
+        custom = np.asarray(config.custom_palette, dtype=np.uint8)
+        return palettes.subsample(custom, config.n_colors)
+    if config.bit_depth >= _TRUE_COLOR_THRESHOLD:
+        return None
+    return palette_gen.generate_palette(grid_colors, config.n_colors, config.palette_algorithm)
+
+
 def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> FilterResult:
     """Apply the full retro-bitmap pipeline to an RGB ``image`` array."""
     if image.ndim != 3 or image.shape[2] not in (3, 4):
@@ -105,18 +119,11 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
     canvas = adjustments.apply(canvas, config.contrast, config.saturation, config.gamma)
     grid_colors = gridmod.downsample(canvas, config.grid_size, mode=config.block_sampling)
 
-    if config.palette_mode == "fixed":
-        palette = palettes.subsample(palettes.get_palette(config.fixed_palette), config.n_colors)
-        quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
-    elif config.palette_mode == "custom":
-        custom_palette = np.asarray(config.custom_palette, dtype=np.uint8)
-        palette = palettes.subsample(custom_palette, config.n_colors)
-        quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
-    elif config.bit_depth >= _TRUE_COLOR_THRESHOLD:
+    palette = _resolve_palette(grid_colors, config)
+    if palette is None:
         palette = np.unique(grid_colors.reshape(-1, 3), axis=0)
         quantized_grid = grid_colors
     else:
-        palette = palette_gen.generate_palette(grid_colors, config.n_colors, config.palette_algorithm)
         quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
 
     output = gridmod.upscale(

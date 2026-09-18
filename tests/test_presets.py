@@ -3,11 +3,8 @@ import pytest
 
 from bitmapper.pipeline import BitmapFilterConfig, apply_bitmap_filter
 from bitmapper.presets import get_preset, list_presets
+from conftest import random_image
 
-
-def _random_image(size=40, seed=0):
-    rng = np.random.default_rng(seed)
-    return rng.integers(0, 256, size=(size, size, 3), dtype=np.uint8)
 
 
 @pytest.mark.parametrize("name", list_presets())
@@ -21,7 +18,7 @@ def test_preset_builds_a_valid_config(name):
 @pytest.mark.parametrize("name", list_presets())
 def test_preset_runs_through_the_pipeline(name):
     config = get_preset(name, output_size=(40, 40), grid_size=(8, 8))
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
     assert result.output.shape == (40, 40, 3)
 
 

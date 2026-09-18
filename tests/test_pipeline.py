@@ -3,11 +3,8 @@ import pytest
 
 from bitmapper.dither import list_methods as list_dither_methods
 from bitmapper.pipeline import BitmapFilterConfig, apply_bitmap_filter
+from conftest import random_image
 
-
-def _random_image(size=40, seed=0):
-    rng = np.random.default_rng(seed)
-    return rng.integers(0, 256, size=(size, size, 3), dtype=np.uint8)
 
 
 def _assert_blocky(output, grid_size, output_size):
@@ -31,7 +28,7 @@ def test_auto_palette_pipeline_produces_blocky_output_within_color_budget(bit_de
         palette_mode="auto",
         dither=dither,
     )
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
 
     assert result.output.shape == (40, 40, 3)
     assert result.grid.shape == (8, 8, 3)
@@ -50,7 +47,7 @@ def test_fixed_palette_subsampled_to_bit_depth_budget():
         fixed_palette="ega",
         dither="floyd_steinberg",
     )
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
 
     assert len(result.palette) == 8
     used_colors = {tuple(c) for c in result.output.reshape(-1, 3)}
@@ -66,7 +63,7 @@ def test_fixed_palette_pipeline_uses_only_fixed_colors():
         fixed_palette="ega",
         dither="floyd_steinberg",
     )
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
 
     ega_set = {tuple(c) for c in result.palette}
     used_colors = {tuple(c) for c in result.output.reshape(-1, 3)}
@@ -81,17 +78,17 @@ def test_true_color_bit_depth_skips_dithering_and_passes_through():
         palette_mode="auto",
         dither="floyd_steinberg",  # should be ignored at true-color depth
     )
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
 
     direct_grid = apply_bitmap_filter(
-        _random_image(),
+        random_image(),
         BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=24),
     ).grid
     np.testing.assert_array_equal(result.grid, direct_grid)
 
 
 def test_block_sampling_nearest_vs_average_differ():
-    img = _random_image(size=40, seed=2)
+    img = random_image(size=40, seed=2)
     cfg_avg = BitmapFilterConfig(output_size=(40, 40), grid_size=(4, 4), bit_depth=8, block_sampling="average")
     cfg_near = BitmapFilterConfig(output_size=(40, 40), grid_size=(4, 4), bit_depth=8, block_sampling="nearest")
 
@@ -102,7 +99,7 @@ def test_block_sampling_nearest_vs_average_differ():
 
 
 def test_rgba_input_is_handled():
-    rgba = np.dstack([_random_image(size=16), np.full((16, 16), 255, dtype=np.uint8)])
+    rgba = np.dstack([random_image(size=16), np.full((16, 16), 255, dtype=np.uint8)])
     config = BitmapFilterConfig(output_size=(16, 16), grid_size=(4, 4), bit_depth=4)
     result = apply_bitmap_filter(rgba, config)
     assert result.output.shape == (16, 16, 3)
@@ -122,10 +119,10 @@ def test_fixed_palette_mode_requires_a_name():
 
 def test_scanlines_darken_alternate_output_rows():
     config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=8, scanlines=0.0)
-    plain = apply_bitmap_filter(_random_image(), config)
+    plain = apply_bitmap_filter(random_image(), config)
 
     scanlined_config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=8, scanlines=1.0)
-    scanlined = apply_bitmap_filter(_random_image(), scanlined_config)
+    scanlined = apply_bitmap_filter(random_image(), scanlined_config)
 
     np.testing.assert_array_equal(scanlined.output[1::2], 0)
     np.testing.assert_array_equal(scanlined.output[0::2], plain.output[0::2])
@@ -140,7 +137,7 @@ def test_invalid_scanlines_rejected():
 
 def test_grid_gap_draws_gutters_between_blocks():
     config = BitmapFilterConfig(output_size=(40, 40), grid_size=(4, 4), bit_depth=8, grid_gap_px=2)
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
 
     # 40 / 4 grid cols = 10px blocks -> boundaries at 10, 20, 30
     for edge in (10, 20, 30):
@@ -154,19 +151,19 @@ def test_invalid_grid_gap_rejected():
 
 def test_adjustments_defaults_match_no_adjustment():
     config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=8)
-    plain = apply_bitmap_filter(_random_image(), config)
+    plain = apply_bitmap_filter(random_image(), config)
 
     adjusted_config = BitmapFilterConfig(
         output_size=(40, 40), grid_size=(8, 8), bit_depth=8, contrast=1.0, saturation=1.0, gamma=1.0,
     )
-    adjusted = apply_bitmap_filter(_random_image(), adjusted_config)
+    adjusted = apply_bitmap_filter(random_image(), adjusted_config)
 
     np.testing.assert_array_equal(plain.output, adjusted.output)
 
 
 def test_saturation_zero_produces_grayscale_output():
     config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=24, saturation=0.0)
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
     flat = result.output.reshape(-1, 3)
     assert (flat[:, 0] == flat[:, 1]).all() and (flat[:, 1] == flat[:, 2]).all()
 
@@ -189,13 +186,13 @@ def test_zero_dither_strength_matches_no_dither():
     plain_config = BitmapFilterConfig(
         output_size=(40, 40), grid_size=(8, 8), bit_depth=4, palette_mode="fixed", fixed_palette="ega", dither="none",
     )
-    plain = apply_bitmap_filter(_random_image(), plain_config)
+    plain = apply_bitmap_filter(random_image(), plain_config)
 
     zero_strength_config = BitmapFilterConfig(
         output_size=(40, 40), grid_size=(8, 8), bit_depth=4, palette_mode="fixed", fixed_palette="ega",
         dither="floyd_steinberg", dither_strength=0.0,
     )
-    zero_strength = apply_bitmap_filter(_random_image(), zero_strength_config)
+    zero_strength = apply_bitmap_filter(random_image(), zero_strength_config)
 
     np.testing.assert_array_equal(plain.output, zero_strength.output)
 
@@ -211,7 +208,7 @@ def test_custom_palette_pipeline_uses_only_custom_colors():
         output_size=(40, 40), grid_size=(8, 8), bit_depth=4,
         palette_mode="custom", custom_palette=custom, dither="floyd_steinberg",
     )
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
 
     custom_set = {tuple(c) for c in custom}
     used_colors = {tuple(c) for c in result.output.reshape(-1, 3)}
@@ -224,7 +221,7 @@ def test_custom_palette_subsampled_to_bit_depth_budget():
         output_size=(40, 40), grid_size=(8, 8), bit_depth=3,  # budget of 8
         palette_mode="custom", custom_palette=custom,
     )
-    result = apply_bitmap_filter(_random_image(), config)
+    result = apply_bitmap_filter(random_image(), config)
     assert len(result.palette) == 8
 
 

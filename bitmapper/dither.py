@@ -6,6 +6,8 @@ full-resolution noise underneath the blocks.
 """
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from .quantize import nearest_color
@@ -91,45 +93,14 @@ def _error_diffusion(
     return np.clip(img, 0, 255).astype(np.uint8)
 
 
-def floyd_steinberg(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
-    """Classic Floyd-Steinberg error-diffusion dithering onto ``palette``."""
-    kernel, divisor = _DIFFUSION_KERNELS["floyd_steinberg"]
-    return _error_diffusion(image, palette, kernel, divisor, strength)
-
-
-def atkinson(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
-    """Atkinson error-diffusion dithering (classic Mac look)."""
-    kernel, divisor = _DIFFUSION_KERNELS["atkinson"]
-    return _error_diffusion(image, palette, kernel, divisor, strength)
-
-
-def jarvis_judice_ninke(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
-    """Jarvis-Judice-Ninke error-diffusion dithering (wide kernel, smooth)."""
-    kernel, divisor = _DIFFUSION_KERNELS["jarvis_judice_ninke"]
-    return _error_diffusion(image, palette, kernel, divisor, strength)
-
-
-def stucki(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
-    """Stucki error-diffusion dithering."""
-    kernel, divisor = _DIFFUSION_KERNELS["stucki"]
-    return _error_diffusion(image, palette, kernel, divisor, strength)
-
-
-def sierra(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
-    """Sierra error-diffusion dithering."""
-    kernel, divisor = _DIFFUSION_KERNELS["sierra"]
-    return _error_diffusion(image, palette, kernel, divisor, strength)
-
-
-def sierra_lite(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
-    """Sierra Lite error-diffusion dithering (cheap, small kernel)."""
-    kernel, divisor = _DIFFUSION_KERNELS["sierra_lite"]
-    return _error_diffusion(image, palette, kernel, divisor, strength)
-
-
-def burkes(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
-    """Burkes error-diffusion dithering."""
-    kernel, divisor = _DIFFUSION_KERNELS["burkes"]
+def error_diffusion(image: np.ndarray, palette: np.ndarray, method: str, strength: float = 1.0) -> np.ndarray:
+    """Error-diffusion dithering onto ``palette`` using the named kernel
+    from ``_DIFFUSION_KERNELS`` (floyd_steinberg, atkinson, stucki, ...).
+    """
+    try:
+        kernel, divisor = _DIFFUSION_KERNELS[method]
+    except KeyError:
+        raise ValueError(f"unknown error-diffusion kernel: {method!r}") from None
     return _error_diffusion(image, palette, kernel, divisor, strength)
 
 
@@ -195,14 +166,11 @@ def random_dither(
     return quantized
 
 
+# Error-diffusion methods are registered straight from the kernel table, so
+# adding a kernel to _DIFFUSION_KERNELS is all it takes to expose a new
+# method (and to pick up the parametrized tests that read list_methods()).
 _METHODS = {
-    "floyd_steinberg": floyd_steinberg,
-    "atkinson": atkinson,
-    "jarvis_judice_ninke": jarvis_judice_ninke,
-    "stucki": stucki,
-    "sierra": sierra,
-    "sierra_lite": sierra_lite,
-    "burkes": burkes,
+    **{name: partial(error_diffusion, method=name) for name in _DIFFUSION_KERNELS},
     "ordered": ordered,
     "ordered_2x2": ordered_2x2,
     "ordered_8x8": ordered_8x8,

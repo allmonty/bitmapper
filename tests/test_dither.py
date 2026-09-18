@@ -2,8 +2,9 @@ import numpy as np
 import pytest
 
 from bitmapper.dither import (
+    _DIFFUSION_KERNELS,
     apply,
-    floyd_steinberg,
+    error_diffusion,
     list_methods,
     ordered,
     ordered_2x2,
@@ -13,16 +14,9 @@ from bitmapper.dither import (
 
 PALETTE = np.array([[0, 0, 0], [255, 255, 255]], dtype=np.uint8)
 
-# Error-diffusion methods that share the generic _error_diffusion helper.
-DIFFUSION_METHODS = [
-    "floyd_steinberg",
-    "atkinson",
-    "jarvis_judice_ninke",
-    "stucki",
-    "sierra",
-    "sierra_lite",
-    "burkes",
-]
+# Read from the kernel table rather than a hardcoded list, so a newly
+# registered kernel is covered by these tests automatically.
+DIFFUSION_METHODS = sorted(_DIFFUSION_KERNELS)
 ORDERED_METHODS = ["ordered", "ordered_2x2", "ordered_8x8"]
 ALL_METHODS = DIFFUSION_METHODS + ORDERED_METHODS + ["random"]
 
@@ -56,8 +50,16 @@ def test_diffusion_preserves_overall_brightness_roughly(gradient_image, method):
     assert abs(original_mean - out_mean) < 40  # loose bound, error diffusion is approximate
 
 
-def test_floyd_steinberg_matches_apply_dispatch(gradient_image):
-    assert np.array_equal(floyd_steinberg(gradient_image, PALETTE), apply(gradient_image, PALETTE, "floyd_steinberg"))
+@pytest.mark.parametrize("method", DIFFUSION_METHODS)
+def test_error_diffusion_matches_apply_dispatch(gradient_image, method):
+    assert np.array_equal(
+        error_diffusion(gradient_image, PALETTE, method), apply(gradient_image, PALETTE, method)
+    )
+
+
+def test_error_diffusion_rejects_unknown_kernel(gradient_image):
+    with pytest.raises(ValueError):
+        error_diffusion(gradient_image, PALETTE, "bogus")
 
 
 def test_ordered_matches_apply_dispatch(gradient_image):
@@ -77,7 +79,7 @@ def test_ordered_matrix_sizes_differ(gradient_image):
 
 
 def test_ordered_and_floyd_steinberg_differ_on_gradient(gradient_image):
-    fs = floyd_steinberg(gradient_image, PALETTE)
+    fs = error_diffusion(gradient_image, PALETTE, "floyd_steinberg")
     od = ordered(gradient_image, PALETTE)
     assert not np.array_equal(fs, od)
 
