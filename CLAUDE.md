@@ -21,6 +21,7 @@ pip install -e .
 pytest -v                       # run the full test suite
 pytest tests/test_dither.py -v  # run a single test file
 pytest tests/test_dither.py::test_apply_rejects_unknown_method -v  # run a single test
+python scripts/benchmark.py     # rough per-stage timing, not a correctness check
 ```
 
 There is no lint/format/build step configured beyond `pytest`.
@@ -57,3 +58,11 @@ After editing the notebook, re-execute it end-to-end and check for errors rather
 ```bash
 jupyter nbconvert --to notebook --execute --inplace notebooks/01_bitmapper_playground.ipynb
 ```
+
+## Performance and the Dart port
+
+`scripts/benchmark.py` times each stage; run it after touching a hot path. As of writing (1200x1200 output, 150x150 grid): `grid.downsample`/`upscale`, `quantize.nearest_color`, `adjustments`, `effects`, and the ordered/random dither methods are all vectorized NumPy and take well under 100ms. The error-diffusion methods (Floyd-Steinberg and its 6 relatives) are the one slow stage — 200-450ms at this size, scaling roughly with `grid pixels × kernel taps`, because each pixel's quantized color depends on the already-diffused error of its neighbors, so it can't be vectorized across the whole grid the way the other stages are; it runs as a genuine nested Python loop. `_error_diffusion` folds each kernel tap's `weight * strength / divisor` once per call (not per pixel) to keep that loop as cheap as reasonably possible without changing behavior.
+
+**Don't reach for numba/Cython to fix this.** The slowness is a Python-interpreter artifact, not an algorithmic one — the same nested loop in Dart (AOT-compiled) runs at native speed, so this isn't a problem to engineer around in the reference implementation, just to be aware of when comparing notebook timings to what the Flutter app will feel like. Optimizing further here would also pull the reference implementation away from the plain, directly-portable form that's the whole point of keeping `bitmapper/` pure NumPy. If the notebook feels sluggish, prefer a smaller `grid_size` for iteration (see the "Grid resolution" cell) over adding a Python-specific speedup.
+
+When porting a stage to Dart: the vectorized NumPy stages (grid, quantize, ordered/random dither, adjustments, effects) need to be re-expressed as explicit loops over typed arrays (`Uint8List`/`Float64List`) — Dart has no NumPy — so budget for that even though they're "fast" here. The error-diffusion stages, by contrast, translate close to line-for-line since they're already a nested loop.

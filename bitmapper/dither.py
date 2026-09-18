@@ -71,6 +71,9 @@ def _error_diffusion(
     img = image.astype(np.float64).copy()
     pal = palette.astype(np.float64)
     h, w = img.shape[:2]
+    # Fold divisor/strength into each tap's weight once, instead of doing
+    # the same division and multiplication on every pixel in the hot loop.
+    scaled_kernel = [(dx, dy, weight * strength / divisor) for dx, dy, weight in kernel]
 
     for y in range(h):
         for x in range(w):
@@ -80,10 +83,10 @@ def _error_diffusion(
             img[y, x] = new
             error = old - new
 
-            for dx, dy, weight in kernel:
+            for dx, dy, scaled_weight in scaled_kernel:
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < w and 0 <= ny < h:
-                    img[ny, nx] += error * weight / divisor * strength
+                    img[ny, nx] += error * scaled_weight
 
     return np.clip(img, 0, 255).astype(np.uint8)
 
