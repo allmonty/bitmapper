@@ -119,3 +119,8 @@ Flutter app. The algorithms here (box-average downsampling, nearest-neighbor
 upscaling, median-cut/k-means quantization, Bayer-matrix ordered dithering,
 error-diffusion dithering) are standard and documented enough to reimplement
 in Dart.
+
+See [docs/FLUTTER_MIGRATION.md](docs/FLUTTER_MIGRATION.md) for the port plan:
+where the pixel work should run, a stage-by-stage breakdown, the golden-file
+strategy for verifying the Dart port against this implementation, and the
+numeric gotchas that stop it being bit-exact.
