@@ -45,10 +45,19 @@ def downsample(image: np.ndarray, grid_size: tuple[int, int], mode: str = "avera
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
-def upscale(grid_image: np.ndarray, output_size: tuple[int, int]) -> np.ndarray:
+def upscale(
+    grid_image: np.ndarray,
+    output_size: tuple[int, int],
+    gap_px: int = 0,
+    gap_color: tuple[int, int, int] = (0, 0, 0),
+) -> np.ndarray:
     """Replicate each cell of ``grid_image`` (grid_h, grid_w, C) up to
     ``output_size`` = (width, height) pixels, nearest-neighbor style so
     blocks stay flat and hard-edged.
+
+    If ``gap_px`` > 0, a gutter of that width, filled with ``gap_color``, is
+    drawn at every block boundary (between cells, not around the canvas
+    edge), giving the blocks a separated-tile look.
     """
     out_w, out_h = output_size
     grid_h, grid_w = grid_image.shape[:2]
@@ -58,4 +67,17 @@ def upscale(grid_image: np.ndarray, output_size: tuple[int, int]) -> np.ndarray:
 
     out = np.repeat(grid_image, row_repeats, axis=0)
     out = np.repeat(out, col_repeats, axis=1)
+
+    if gap_px > 0:
+        out = out.copy()
+        fill = np.array(gap_color, dtype=out.dtype)
+        half = gap_px // 2
+
+        for edge in np.cumsum(row_repeats)[:-1]:
+            lo, hi = max(0, edge - half), min(out_h, edge + (gap_px - half))
+            out[lo:hi, :] = fill
+        for edge in np.cumsum(col_repeats)[:-1]:
+            lo, hi = max(0, edge - half), min(out_w, edge + (gap_px - half))
+            out[:, lo:hi] = fill
+
     return out

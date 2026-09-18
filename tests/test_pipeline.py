@@ -120,3 +120,17 @@ def test_invalid_scanlines_rejected():
         BitmapFilterConfig(scanlines=-0.1)
     with pytest.raises(ValueError):
         BitmapFilterConfig(scanlines=1.1)
+
+
+def test_grid_gap_draws_gutters_between_blocks():
+    config = BitmapFilterConfig(output_size=(40, 40), grid_size=(4, 4), bit_depth=8, grid_gap_px=2)
+    result = apply_bitmap_filter(_random_image(), config)
+
+    # 40 / 4 grid cols = 10px blocks -> boundaries at 10, 20, 30
+    for edge in (10, 20, 30):
+        np.testing.assert_array_equal(result.output[:, edge - 1:edge + 1], 0)
+
+
+def test_invalid_grid_gap_rejected():
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(grid_gap_px=-1)

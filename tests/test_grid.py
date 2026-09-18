@@ -58,6 +58,37 @@ def test_upscale_replicates_blocks():
     np.testing.assert_array_equal(out[:, 2:], np.broadcast_to([4, 5, 6], (2, 2, 3)))
 
 
+def test_upscale_with_no_gap_is_unchanged():
+    grid = np.full((2, 2, 3), 100, dtype=np.uint8)
+    out = upscale(grid, output_size=(8, 8), gap_px=0)
+    assert (out == 100).all()
+
+
+def test_upscale_gap_draws_gutter_at_block_boundary():
+    grid = np.full((2, 2, 3), 100, dtype=np.uint8)
+    out = upscale(grid, output_size=(8, 8), gap_px=2, gap_color=(0, 0, 0))
+
+    # boundary between the two blocks sits at column/row 4; gap_px=2 draws
+    # columns/rows 3-4 as the gutter.
+    np.testing.assert_array_equal(out[:, 3:5], 0)
+    np.testing.assert_array_equal(out[3:5, :], 0)
+    # interior of each block is untouched
+    np.testing.assert_array_equal(out[0:3, 0:3], 100)
+    np.testing.assert_array_equal(out[0:3, 5:8], 100)
+
+
+def test_upscale_gap_does_not_touch_canvas_edges():
+    grid = np.full((1, 1, 3), 100, dtype=np.uint8)
+    out = upscale(grid, output_size=(8, 8), gap_px=2)
+    assert (out == 100).all()  # single block, no interior boundary to gap
+
+
+def test_upscale_gap_uses_custom_color():
+    grid = np.full((2, 1, 3), 100, dtype=np.uint8)
+    out = upscale(grid, output_size=(4, 8), gap_px=2, gap_color=(255, 0, 0))
+    np.testing.assert_array_equal(out[3:5, :], np.broadcast_to([255, 0, 0], (2, 4, 3)))
+
+
 def test_downsample_then_upscale_round_trip_is_blocky():
     img = np.random.default_rng(0).integers(0, 256, size=(20, 20, 3), dtype=np.uint8)
     grid = downsample(img, grid_size=(4, 4), mode="average")

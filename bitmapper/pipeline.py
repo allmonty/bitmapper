@@ -34,6 +34,8 @@ class BitmapFilterConfig:
     fixed_palette: str | None = None
     dither: str = "none"  # see bitmapper.dither.list_methods()
     scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
+    grid_gap_px: int = 0  # gutter width between blocks, in output pixels
+    grid_gap_color: tuple[int, int, int] = (0, 0, 0)
 
     def __post_init__(self) -> None:
         if not (MIN_BIT_DEPTH <= self.bit_depth <= MAX_BIT_DEPTH):
@@ -48,6 +50,8 @@ class BitmapFilterConfig:
             raise ValueError(f"invalid dither: {self.dither!r}")
         if not (0.0 <= self.scanlines <= 1.0):
             raise ValueError(f"scanlines must be between 0 and 1, got {self.scanlines}")
+        if self.grid_gap_px < 0:
+            raise ValueError(f"grid_gap_px must be >= 0, got {self.grid_gap_px}")
         if self.palette_mode == "fixed" and not self.fixed_palette:
             raise ValueError("fixed_palette must be set when palette_mode='fixed'")
 
@@ -90,7 +94,9 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
         palette = palette_gen.generate_palette(grid_colors, config.n_colors, config.palette_algorithm)
         quantized_grid = apply_dither(grid_colors, palette, config.dither)
 
-    output = gridmod.upscale(quantized_grid, config.output_size)
+    output = gridmod.upscale(
+        quantized_grid, config.output_size, gap_px=config.grid_gap_px, gap_color=config.grid_gap_color
+    )
     if config.scanlines > 0.0:
         output = apply_scanlines(output, config.scanlines)
     return FilterResult(output=output, grid=quantized_grid, palette=palette)
