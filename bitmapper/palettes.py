@@ -184,6 +184,19 @@ _PALETTES = {
 }
 
 
+def subsample(palette: np.ndarray, n_colors: int) -> np.ndarray:
+    """Pick ``n_colors`` evenly-spaced entries from ``palette`` (keeping the
+    first and last), for capping a fixed palette to a smaller color budget.
+    Returns ``palette`` unchanged (copied) if it already has <= ``n_colors``.
+    """
+    if n_colors < 1:
+        raise ValueError(f"n_colors must be >= 1, got {n_colors}")
+    if n_colors >= len(palette):
+        return palette.copy()
+    idx = np.linspace(0, len(palette) - 1, n_colors).round().astype(int)
+    return palette[idx].copy()
+
+
 def list_palettes() -> list[str]:
     return sorted(_PALETTES.keys())
 

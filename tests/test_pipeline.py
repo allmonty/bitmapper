@@ -41,6 +41,22 @@ def test_auto_palette_pipeline_produces_blocky_output_within_color_budget(bit_de
     assert len(used_colors) <= 2 ** bit_depth
 
 
+def test_fixed_palette_subsampled_to_bit_depth_budget():
+    config = BitmapFilterConfig(
+        output_size=(40, 40),
+        grid_size=(8, 8),
+        bit_depth=3,  # 8 colors, less than ega's 16
+        palette_mode="fixed",
+        fixed_palette="ega",
+        dither="floyd_steinberg",
+    )
+    result = apply_bitmap_filter(_random_image(), config)
+
+    assert len(result.palette) == 8
+    used_colors = {tuple(c) for c in result.output.reshape(-1, 3)}
+    assert used_colors.issubset({tuple(c) for c in result.palette})
+
+
 def test_fixed_palette_pipeline_uses_only_fixed_colors():
     config = BitmapFilterConfig(
         output_size=(40, 40),

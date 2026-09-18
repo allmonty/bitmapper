@@ -96,7 +96,7 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
     grid_colors = gridmod.downsample(canvas, config.grid_size, mode=config.block_sampling)
 
     if config.palette_mode == "fixed":
-        palette = palettes.get_palette(config.fixed_palette)
+        palette = palettes.subsample(palettes.get_palette(config.fixed_palette), config.n_colors)
         quantized_grid = apply_dither(grid_colors, palette, config.dither)
     elif config.bit_depth >= _TRUE_COLOR_THRESHOLD:
         palette = np.unique(grid_colors.reshape(-1, 3), axis=0)
