@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image
 
+from . import adjustments
 from . import grid as gridmod
 from . import palette_gen
 from . import palettes
@@ -36,6 +37,9 @@ class BitmapFilterConfig:
     scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
     grid_gap_px: int = 0  # gutter width between blocks, in output pixels
     grid_gap_color: tuple[int, int, int] = (0, 0, 0)
+    contrast: float = 1.0  # 1.0 = no-op, >1 boosts, <1 flattens, 0 = flat gray
+    saturation: float = 1.0  # 1.0 = no-op, >1 boosts, 0 = grayscale
+    gamma: float = 1.0  # 1.0 = no-op, >1 brightens midtones, <1 darkens them
 
     def __post_init__(self) -> None:
         if not (MIN_BIT_DEPTH <= self.bit_depth <= MAX_BIT_DEPTH):
@@ -52,6 +56,12 @@ class BitmapFilterConfig:
             raise ValueError(f"scanlines must be between 0 and 1, got {self.scanlines}")
         if self.grid_gap_px < 0:
             raise ValueError(f"grid_gap_px must be >= 0, got {self.grid_gap_px}")
+        if self.contrast < 0:
+            raise ValueError(f"contrast must be >= 0, got {self.contrast}")
+        if self.saturation < 0:
+            raise ValueError(f"saturation must be >= 0, got {self.saturation}")
+        if self.gamma <= 0:
+            raise ValueError(f"gamma must be > 0, got {self.gamma}")
         if self.palette_mode == "fixed" and not self.fixed_palette:
             raise ValueError("fixed_palette must be set when palette_mode='fixed'")
 
@@ -82,6 +92,7 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
         image = image[:, :, :3]
 
     canvas = _resize_to_canvas(image, config.output_size)
+    canvas = adjustments.apply(canvas, config.contrast, config.saturation, config.gamma)
     grid_colors = gridmod.downsample(canvas, config.grid_size, mode=config.block_sampling)
 
     if config.palette_mode == "fixed":

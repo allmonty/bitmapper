@@ -134,3 +134,36 @@ def test_grid_gap_draws_gutters_between_blocks():
 def test_invalid_grid_gap_rejected():
     with pytest.raises(ValueError):
         BitmapFilterConfig(grid_gap_px=-1)
+
+
+def test_adjustments_defaults_match_no_adjustment():
+    config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=8)
+    plain = apply_bitmap_filter(_random_image(), config)
+
+    adjusted_config = BitmapFilterConfig(
+        output_size=(40, 40), grid_size=(8, 8), bit_depth=8, contrast=1.0, saturation=1.0, gamma=1.0,
+    )
+    adjusted = apply_bitmap_filter(_random_image(), adjusted_config)
+
+    np.testing.assert_array_equal(plain.output, adjusted.output)
+
+
+def test_saturation_zero_produces_grayscale_output():
+    config = BitmapFilterConfig(output_size=(40, 40), grid_size=(8, 8), bit_depth=24, saturation=0.0)
+    result = apply_bitmap_filter(_random_image(), config)
+    flat = result.output.reshape(-1, 3)
+    assert (flat[:, 0] == flat[:, 1]).all() and (flat[:, 1] == flat[:, 2]).all()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"contrast": -1.0},
+        {"saturation": -1.0},
+        {"gamma": 0.0},
+        {"gamma": -1.0},
+    ],
+)
+def test_invalid_adjustments_rejected(kwargs):
+    with pytest.raises(ValueError):
+        BitmapFilterConfig(**kwargs)
