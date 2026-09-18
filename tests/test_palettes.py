@@ -11,6 +11,13 @@ EXPECTED_SIZES = {
     "c64": 16,
     "zxspectrum": 16,
     "pico8": 16,
+    "nes": 64,
+    "appleii": 16,
+    "msx": 16,
+    "teletext": 8,
+    "monochrome_green": 4,
+    "monochrome_amber": 4,
+    "sepia": 32,
 }
 
 
