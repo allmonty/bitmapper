@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bitmapper"
+version = "0.1.0"
+description = "Retro bitmap image filter (80s/90s/early-2000s pixel-art aesthetics)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pillow>=10.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["bitmapper*"]

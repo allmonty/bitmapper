@@ -1,0 +1,86 @@
+"""High-level bitmap filter: config + the function that applies it."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+import numpy as np
+from PIL import Image
+
+from . import grid as gridmod
+from . import palette_gen
+from . import palettes
+from .dither import apply as apply_dither
+
+VALID_BIT_DEPTHS = (2, 4, 8, 16, 32)
+# 16/32-bit color is effectively "true color" for a photo — generating and
+# dithering onto a palette of 65536+ colors from a small grid is both
+# pointless (the grid rarely has that many unique colors) and expensive, so
+# those depths skip palette generation/dithering and pass the block-sampled
+# colors straight through. Fixed palettes remain available at any depth.
+_TRUE_COLOR_THRESHOLD = 16
+
+
+@dataclass
+class BitmapFilterConfig:
+    output_size: tuple[int, int] = (2000, 2000)  # (width, height)
+    grid_size: tuple[int, int] = (200, 200)  # (cols, rows)
+    bit_depth: int = 8
+    block_sampling: str = "average"  # "average" | "nearest"
+    palette_mode: str = "auto"  # "auto" | "fixed"
+    palette_algorithm: str = "median_cut"  # "median_cut" | "kmeans"
+    fixed_palette: str | None = None
+    dither: str = "none"  # "none" | "floyd_steinberg" | "ordered"
+
+    def __post_init__(self) -> None:
+        if self.bit_depth not in VALID_BIT_DEPTHS:
+            raise ValueError(f"bit_depth must be one of {VALID_BIT_DEPTHS}, got {self.bit_depth}")
+        if self.block_sampling not in ("average", "nearest"):
+            raise ValueError(f"invalid block_sampling: {self.block_sampling!r}")
+        if self.palette_mode not in ("auto", "fixed"):
+            raise ValueError(f"invalid palette_mode: {self.palette_mode!r}")
+        if self.dither not in ("none", "floyd_steinberg", "ordered"):
+            raise ValueError(f"invalid dither: {self.dither!r}")
+        if self.palette_mode == "fixed" and not self.fixed_palette:
+            raise ValueError("fixed_palette must be set when palette_mode='fixed'")
+
+    @property
+    def n_colors(self) -> int:
+        return 2 ** self.bit_depth
+
+
+@dataclass
+class FilterResult:
+    output: np.ndarray  # full canvas, output_size
+    grid: np.ndarray  # low-res quantized grid, grid_size
+    palette: np.ndarray  # colors actually used
+
+
+def _resize_to_canvas(image: np.ndarray, output_size: tuple[int, int]) -> np.ndarray:
+    if image.shape[1::-1] == tuple(output_size):
+        return image
+    pil_img = Image.fromarray(image).resize(output_size, Image.Resampling.LANCZOS)
+    return np.array(pil_img)
+
+
+def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> FilterResult:
+    """Apply the full retro-bitmap pipeline to an RGB ``image`` array."""
+    if image.ndim != 3 or image.shape[2] not in (3, 4):
+        raise ValueError("image must be an (H, W, 3) or (H, W, 4) array")
+    if image.shape[2] == 4:
+        image = image[:, :, :3]
+
+    canvas = _resize_to_canvas(image, config.output_size)
+    grid_colors = gridmod.downsample(canvas, config.grid_size, mode=config.block_sampling)
+
+    if config.palette_mode == "fixed":
+        palette = palettes.get_palette(config.fixed_palette)
+        quantized_grid = apply_dither(grid_colors, palette, config.dither)
+    elif config.bit_depth >= _TRUE_COLOR_THRESHOLD:
+        palette = np.unique(grid_colors.reshape(-1, 3), axis=0)
+        quantized_grid = grid_colors
+    else:
+        palette = palette_gen.generate_palette(grid_colors, config.n_colors, config.palette_algorithm)
+        quantized_grid = apply_dither(grid_colors, palette, config.dither)
+
+    output = gridmod.upscale(quantized_grid, config.output_size)
+    return FilterResult(output=output, grid=quantized_grid, palette=palette)
