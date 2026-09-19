@@ -89,6 +89,24 @@ def test_upscale_gap_uses_custom_color():
     np.testing.assert_array_equal(out[3:5, :], np.broadcast_to([255, 0, 0], (2, 4, 3)))
 
 
+def test_gap_is_dropped_when_a_cell_is_only_1px_instead_of_covering_the_canvas():
+    # 1:1 replication (cell = 1px): a gap this wide would otherwise paint
+    # every column/row, leaving no cell color visible at all.
+    grid = np.arange(2 * 2 * 3, dtype=np.uint8).reshape(2, 2, 3)
+    out = upscale(grid, output_size=(2, 2), gap_px=5, gap_color=(255, 0, 0))
+    np.testing.assert_array_equal(out, upscale(grid, output_size=(2, 2)))
+    assert not (out == [255, 0, 0]).all(axis=-1).any()
+
+
+def test_gap_shrinks_to_fit_when_it_would_otherwise_cover_a_cell():
+    # cell = 2px; a requested gap of 3 can't fit, so it shrinks to 1 (the
+    # largest gap that still leaves each cell visible).
+    grid = np.arange(2 * 2 * 3, dtype=np.uint8).reshape(2, 2, 3)
+    out = upscale(grid, output_size=(4, 4), gap_px=3, gap_color=(255, 0, 0))
+    expected = upscale(grid, output_size=(4, 4), gap_px=1, gap_color=(255, 0, 0))
+    np.testing.assert_array_equal(out, expected)
+
+
 def test_downsample_then_upscale_round_trip_is_blocky():
     img = np.random.default_rng(0).integers(0, 256, size=(20, 20, 3), dtype=np.uint8)
     grid = downsample(img, grid_size=(4, 4), mode="average")

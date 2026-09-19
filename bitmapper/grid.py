@@ -56,6 +56,14 @@ def downsample(image: np.ndarray, grid_size: tuple[int, int], mode: str = "avera
     return np.clip(out, 0, 255).astype(np.uint8)
 
 
+def _min_positive_run(repeats: list[int]) -> int:
+    """The smallest non-empty block size in ``repeats`` (0 if every block is
+    empty, which only happens when the grid has more cells than output
+    pixels along that axis)."""
+    positive = [r for r in repeats if r > 0]
+    return min(positive) if positive else 0
+
+
 def upscale(
     grid_image: np.ndarray,
     output_size: tuple[int, int],
@@ -68,7 +76,11 @@ def upscale(
 
     If ``gap_px`` > 0, a gutter of that width, filled with ``gap_color``, is
     drawn at every block boundary (between cells, not around the canvas
-    edge), giving the blocks a separated-tile look.
+    edge), giving the blocks a separated-tile look. The gap shrinks (and,
+    below 2px, disappears) when a block is too small to show any of its own
+    color around a full-width gutter — otherwise, with enough grid cells,
+    adjacent gutters would tile the whole canvas and the image would render
+    as solid ``gap_color`` instead of a fine chunky grid.
     """
     out_w, out_h = output_size
     grid_h, grid_w = grid_image.shape[:2]
@@ -80,15 +92,18 @@ def upscale(
     out = np.repeat(out, col_repeats, axis=1)
 
     if gap_px > 0:
-        out = out.copy()
-        fill = np.array(gap_color, dtype=out.dtype)
-        half = gap_px // 2
+        min_run = min(_min_positive_run(row_repeats), _min_positive_run(col_repeats))
+        effective_gap = min(gap_px, min_run - 1) if min_run > 0 else 0
+        if effective_gap > 0:
+            out = out.copy()
+            fill = np.array(gap_color, dtype=out.dtype)
+            half = effective_gap // 2
 
-        for edge in np.cumsum(row_repeats)[:-1]:
-            lo, hi = max(0, edge - half), min(out_h, edge + (gap_px - half))
-            out[lo:hi, :] = fill
-        for edge in np.cumsum(col_repeats)[:-1]:
-            lo, hi = max(0, edge - half), min(out_w, edge + (gap_px - half))
-            out[:, lo:hi] = fill
+            for edge in np.cumsum(row_repeats)[:-1]:
+                lo, hi = max(0, edge - half), min(out_h, edge + (effective_gap - half))
+                out[lo:hi, :] = fill
+            for edge in np.cumsum(col_repeats)[:-1]:
+                lo, hi = max(0, edge - half), min(out_w, edge + (effective_gap - half))
+                out[:, lo:hi] = fill
 
     return out
