@@ -40,6 +40,39 @@ def test_black_becomes_the_darkest_band_gray():
     assert out[0, 0].tolist() == [31, 31, 31]  # (0 + 0.5) * 255 / 4
 
 
+def test_hue_is_kept_even_when_brightening_would_clip_a_channel():
+    # Old algorithm: factor ~1.376 pushes r=220 past 255, truncating it back
+    # to 255 while g/b keep scaling, distorting the ratio.
+    grid = np.array([[[220, 40, 30]]], dtype=np.uint8)
+    r, g, b = apply_shade_bands(grid, 3)[0, 0].astype(float)
+    assert r <= 255
+    assert r / g == pytest.approx(220 / 40, rel=0.1)
+    assert g / b == pytest.approx(40 / 30, rel=0.15)
+
+
+@pytest.mark.parametrize("bands", [2, 3, 4, 5, 6, 7, 8])
+def test_hue_stays_close_for_saturated_colors_at_every_band_count(bands):
+    # A regression guard for the whole class of the bug above: none of
+    # these ratios should move far from the source once brightening no
+    # longer silently clips a channel.
+    saturated = [
+        (255, 60, 30),
+        (60, 255, 30),
+        (30, 60, 255),
+        (255, 200, 30),
+        (230, 90, 210),
+    ]
+    for color in saturated:
+        grid = np.array([[color]], dtype=np.uint8)
+        out = apply_shade_bands(grid, bands)[0, 0].astype(float)
+        for i in range(3):
+            for j in range(3):
+                if color[j] == 0 or out[j] == 0:
+                    continue
+                expected = color[i] / color[j]
+                assert out[i] / out[j] == pytest.approx(expected, abs=expected * 0.15 + 0.1)
+
+
 @pytest.mark.parametrize("bands", [1, 9, -1])
 def test_rejects_invalid_band_counts(bands):
     with pytest.raises(ValueError):
@@ -126,8 +159,8 @@ def _shared_speckles():
 
 
 def test_shade_bands_match_the_dart_port():
-    assert apply_shade_bands(_shared_grid(), 3).reshape(-1).tolist() == [42, 42, 42, 195, 255, 11, 75, 139, 203, 110, 9, 35, 94, 134, 175, 16, 48, 80, 197, 253, 38, 85, 136, 188, 255, 51, 111, 116, 157, 0, 70, 140, 209, 117, 5, 34, 92, 135, 177, 12, 49, 85, 196, 255, 30, 83, 137, 191, 255, 45, 110, 163, 223, 255, 65, 141, 217, 126, 1, 34, 91, 135, 180, 8, 50, 91, 196, 255, 23, 80, 138, 196, 255, 38, 109, 160, 224, 255, 19, 47, 75, 198, 251, 47, 89, 136, 183, 2, 51, 100]
-    assert apply_shade_bands(_shared_grid(), 5).reshape(-1).tolist() == [25, 25, 25, 164, 218, 9, 75, 139, 203, 199, 16, 64, 132, 188, 245, 29, 87, 144, 165, 213, 32, 85, 136, 188, 255, 51, 111, 163, 220, 1, 42, 84, 125, 212, 9, 62, 130, 189, 248, 23, 88, 153, 165, 214, 26, 83, 137, 191, 255, 45, 110, 137, 187, 238, 39, 84, 130, 228, 2, 61, 91, 135, 180, 15, 90, 165, 164, 216, 19, 80, 138, 196, 185, 23, 65, 135, 188, 241, 35, 85, 135, 214, 255, 51, 89, 136, 183, 1, 30, 60]
+    assert apply_shade_bands(_shared_grid(), 3).reshape(-1).tolist() == [42, 42, 42, 191, 254, 10, 75, 139, 203, 110, 9, 35, 94, 134, 175, 16, 48, 80, 197, 253, 38, 85, 136, 188, 255, 46, 100, 116, 157, 0, 70, 140, 209, 117, 5, 34, 92, 135, 177, 12, 49, 85, 196, 255, 30, 83, 137, 191, 255, 39, 95, 146, 200, 255, 65, 141, 217, 126, 1, 34, 91, 135, 180, 8, 50, 91, 194, 255, 22, 80, 138, 196, 254, 31, 90, 142, 198, 255, 19, 47, 75, 198, 251, 47, 89, 136, 183, 2, 51, 100]
+    assert apply_shade_bands(_shared_grid(), 5).reshape(-1).tolist() == [25, 25, 25, 164, 218, 9, 75, 139, 203, 199, 16, 64, 132, 188, 245, 29, 87, 144, 165, 213, 32, 85, 136, 188, 255, 46, 100, 163, 220, 1, 42, 84, 125, 212, 9, 62, 130, 189, 248, 23, 88, 153, 165, 214, 26, 83, 137, 191, 255, 39, 95, 137, 187, 238, 39, 84, 130, 228, 2, 61, 91, 135, 180, 15, 90, 165, 164, 216, 19, 80, 138, 196, 185, 23, 65, 135, 188, 241, 35, 85, 135, 200, 255, 47, 89, 136, 183, 1, 30, 60]
 
 
 def test_despeckle_matches_the_dart_port():

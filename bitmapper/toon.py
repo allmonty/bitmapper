@@ -28,9 +28,11 @@ def apply_shade_bands(grid: np.ndarray, bands: int) -> np.ndarray:
 
     Per cell, in this operation order (the Dart port matches it exactly):
     ``band = min(bands - 1, floor(luma * bands / 256))``,
-    ``target = (band + 0.5) * 255 / bands``, then each channel is
-    ``channel * (target / luma)`` clipped and truncated; black cells become
-    gray at ``target``.
+    ``target = (band + 0.5) * 255 / bands``, then ``factor = target / luma``
+    capped so no channel would exceed 255 (``min(factor, 255 / max_channel)``,
+    which only ever reduces a brightening factor, never a darkening one),
+    then each channel is ``channel * factor``, clipped and truncated; black
+    cells become gray at ``target``.
     """
     if bands == 0:
         return grid
@@ -42,7 +44,9 @@ def apply_shade_bands(grid: np.ndarray, bands: int) -> np.ndarray:
     band = np.minimum(bands - 1, np.floor(luma * bands / 256.0))
     target = (band + 0.5) * 255.0 / bands
     safe_luma = np.where(luma > 0, luma, 1.0)
-    scaled = grid.astype(np.float64) * (target / safe_luma)[..., None]
+    max_channel = np.where(luma > 0, grid.astype(np.float64).max(axis=-1), 1.0)
+    factor = np.minimum(target / safe_luma, 255.0 / max_channel)
+    scaled = grid.astype(np.float64) * factor[..., None]
     gray = np.broadcast_to(target[..., None], scaled.shape)
     out = np.where((luma > 0)[..., None], scaled, gray)
     return np.clip(out, 0, 255).astype(np.uint8)
