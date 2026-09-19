@@ -43,7 +43,9 @@ config = BitmapFilterConfig(
     dither_strength=1.0,        # 0 = no dither pattern, 1 = full strength
     scanlines=0.0,               # 0-1, darkens alternate output rows
     grid_gap_px=0,                # gutter width between blocks, in output px
-    outline=0.0,                  # 0-1, sprite-style ink on strong edges (0 = off)
+    outline=0.0,                  # 0-1, ink on edges found by outline_method (0 = off)
+    outline_method="brightness",  # any name from bitmapper.outline.list_methods()
+    outline_ink="darkest",        # any name from bitmapper.outline.list_inks()
     shade_bands=0,                # 0 = off, or 2-8 flat brightness bands (toon)
     despeckle=False,              # replace isolated cells with their neighbours' color
     grid_gap_color=(0, 0, 0),
@@ -94,6 +96,24 @@ Pass
 - **Noise:** `interleaved_gradient_noise` (a deterministic, blue-noise-like
   grain) and `random` (white noise). `dither_strength`
 blends toward `"none"` without introducing off-palette colors.
+
+### Outlining
+
+`bitmapper.outline.list_methods()` picks how edges are found:
+
+- `brightness`: a cell is inked when a 4-neighbour is brighter by more
+  than the threshold. Simple and fast, but on photos it can pick up noisy
+  texture edges as small dots rather than clean lines.
+- `color`: the same neighbour comparison, by RGB distance instead of
+  brightness, so it also finds edges between hues of similar brightness.
+- `sobel`: a 3x3 gradient of the brightness. It finds diagonal and gradual
+  edges that `brightness` misses, closing gaps in the line; generally the
+  best default for photos.
+
+`bitmapper.outline.list_inks()` picks the ink color: `darkest` (the
+palette's darkest color, bold sprite-style lines) or `shaded` (the palette
+color closest to a half-brightness version of the outlined pixel, a
+softer line that varies with what it outlines).
 
 ### Presets
 

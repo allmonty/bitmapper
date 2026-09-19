@@ -14,6 +14,8 @@ from .dither import apply as apply_dither
 from .dither import list_methods as list_dither_methods
 from .effects import apply_scanlines
 from .outline import apply_outline
+from .outline import list_inks as list_outline_inks
+from .outline import list_methods as list_outline_methods
 from .toon import MAX_SHADE_BANDS, MIN_SHADE_BANDS, apply_shade_bands, despeckle
 
 MIN_BIT_DEPTH = 1
@@ -40,7 +42,9 @@ class BitmapFilterConfig:
     dither_strength: float = 1.0  # 0 = no dithering pattern, 1 = full strength
     scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
     grid_gap_px: int = 0  # gutter width between blocks, in output pixels
-    outline: float = 0.0  # 0 = off; sprite-style ink on strong edges, 1 = most edges
+    outline: float = 0.0  # 0 = off; ink on strong edges (found by outline_method), 1 = most edges
+    outline_method: str = "brightness"  # see bitmapper.outline.list_methods()
+    outline_ink: str = "darkest"  # see bitmapper.outline.list_inks()
     shade_bands: int = 0  # 0 = off; else 2-8 flat brightness bands (toon shading)
     despeckle: bool = False  # replace isolated cells with their neighbours' color
     grid_gap_color: tuple[int, int, int] = (0, 0, 0)
@@ -65,6 +69,10 @@ class BitmapFilterConfig:
             raise ValueError(f"scanlines must be between 0 and 1, got {self.scanlines}")
         if not (0.0 <= self.outline <= 1.0):
             raise ValueError(f"outline must be between 0 and 1, got {self.outline}")
+        if self.outline_method not in list_outline_methods():
+            raise ValueError(f"invalid outline_method: {self.outline_method!r}")
+        if self.outline_ink not in list_outline_inks():
+            raise ValueError(f"invalid outline_ink: {self.outline_ink!r}")
         if self.shade_bands != 0 and not (MIN_SHADE_BANDS <= self.shade_bands <= MAX_SHADE_BANDS):
             raise ValueError(
                 f"shade_bands must be 0 or {MIN_SHADE_BANDS}..{MAX_SHADE_BANDS}, got {self.shade_bands}"
@@ -141,7 +149,9 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
     if config.despeckle:
         quantized_grid = despeckle(quantized_grid)
     if config.outline > 0.0:
-        quantized_grid = apply_outline(quantized_grid, palette, config.outline)
+        quantized_grid = apply_outline(
+            quantized_grid, palette, config.outline, config.outline_method, config.outline_ink
+        )
 
     output = gridmod.upscale(
         quantized_grid, config.output_size, gap_px=config.grid_gap_px, gap_color=config.grid_gap_color

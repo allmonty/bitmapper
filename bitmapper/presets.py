@@ -115,16 +115,18 @@ _PRESETS: dict[str, dict] = {
     # Pixel art with sprite-style ink outlines on strong edges.
     "pixel_art_sprite": dict(
         palette_mode="fixed", fixed_palette="pico8", bit_depth=4,
-        dither="none", contrast=1.15, saturation=1.25, outline=0.4,
+        dither="none", contrast=1.15, saturation=1.25,
+        outline=0.4, outline_method="sobel",
     ),
     # Cel shading: flat brightness bands, no stray cells, ink outlines.
     "toon": dict(
         palette_mode="auto", bit_depth=4, dither="none", saturation=1.3,
-        shade_bands=3, despeckle=True, outline=0.5,
+        shade_bands=3, despeckle=True, outline=0.5, outline_method="sobel",
     ),
     "toon_pastel": dict(
         palette_mode="fixed", fixed_palette="sweetie16", bit_depth=4,
-        dither="none", saturation=1.3, shade_bands=4, despeckle=True, outline=0.5,
+        dither="none", saturation=1.3, shade_bands=4, despeckle=True,
+        outline=0.5, outline_method="sobel",
     ),
 }
 
