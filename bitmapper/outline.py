@@ -98,6 +98,49 @@ def _sobel_mask(grid: np.ndarray, threshold: float) -> np.ndarray:
     return strong & darker
 
 
+def _dilate8(mask: np.ndarray) -> np.ndarray:
+    """Grow ``mask`` by one cell over the full 8-neighbourhood.
+    Out-of-canvas neighbours count as false, so this never grows the mask
+    past the grid edge."""
+    out = mask.copy()
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            y_src = slice(max(0, -dy), mask.shape[0] - max(0, dy))
+            x_src = slice(max(0, -dx), mask.shape[1] - max(0, dx))
+            y_dst = slice(max(0, dy), mask.shape[0] - max(0, -dy))
+            x_dst = slice(max(0, dx), mask.shape[1] - max(0, -dx))
+            out[y_dst, x_dst] |= mask[y_src, x_src]
+    return out
+
+
+def _erode8(mask: np.ndarray) -> np.ndarray:
+    """Shrink ``mask`` by one cell over the full 8-neighbourhood.
+    Out-of-canvas neighbours count as true, so a line against the canvas
+    edge isn't eroded away just for being near it."""
+    out = mask.copy()
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            y_src = slice(max(0, -dy), mask.shape[0] - max(0, dy))
+            x_src = slice(max(0, -dx), mask.shape[1] - max(0, dx))
+            y_dst = slice(max(0, dy), mask.shape[0] - max(0, -dy))
+            x_dst = slice(max(0, dx), mask.shape[1] - max(0, -dx))
+            out[y_dst, x_dst] &= mask[y_src, x_src]
+            # Cells whose neighbour falls outside the canvas keep their
+            # current value here (as if that neighbour were true).
+    return out
+
+
+def _close_gaps(mask: np.ndarray) -> np.ndarray:
+    """Bridge 1-cell gaps in ``mask`` with a binary closing: dilate by 1
+    over the full 8-neighbourhood, then erode by 1 over the same
+    neighbourhood."""
+    return _erode8(_dilate8(mask))
+
+
 def _dilate4(mask: np.ndarray) -> np.ndarray:
     """Grow ``mask`` by one cell in each of the 4 cardinal directions (a
     plus shape per step), which tapers more gracefully than 8-neighbour
@@ -130,6 +173,7 @@ def apply_outline(
     ink: str = "darkest",
     edge_grid: np.ndarray | None = None,
     thickness: int = 1,
+    close_gaps: bool = False,
 ) -> np.ndarray:
     """Ink the edges of ``grid`` (rows, cols, 3) found by ``method`` with
     colors from ``palette``, using ``ink`` to pick the color. ``strength``
@@ -144,6 +188,12 @@ def apply_outline(
     ``thickness`` (1..3, ``MIN_OUTLINE_THICKNESS``..``MAX_OUTLINE_THICKNESS``)
     grows the line by dilating the edge mask one 4-neighbour step per extra
     cell; 1 (the default) is the original one-cell line.
+
+    ``close_gaps`` (default off) bridges 1-cell gaps in the edge mask with
+    a binary closing (8-neighbour dilate then erode), applied before
+    ``thickness`` so a requested thickness stays consistent along the
+    whole line instead of erosion partially undoing it right where a gap
+    was bridged.
     """
     if not (0.0 <= strength <= 1.0):
         raise ValueError(f"outline strength must be between 0 and 1, got {strength}")
@@ -172,6 +222,8 @@ def apply_outline(
         mask = _color_mask(edge_grid, threshold)
     else:
         mask = _sobel_mask(edge_grid, threshold)
+    if close_gaps:
+        mask = _close_gaps(mask)
     for _ in range(thickness - 1):
         mask = _dilate4(mask)
 

@@ -47,6 +47,7 @@ class BitmapFilterConfig:
     outline_method: str = "brightness"  # see bitmapper.outline.list_methods()
     outline_ink: str = "darkest"  # see bitmapper.outline.list_inks()
     outline_thickness: int = 1  # 1-3 grid cells; see outline.MIN/MAX_OUTLINE_THICKNESS
+    outline_close_gaps: bool = False  # bridge 1-cell gaps in the outline mask before inking
     shade_bands: int = 0  # 0 = off; else 2-8 flat brightness bands (toon shading)
     despeckle: bool = False  # replace isolated cells with their neighbours' color
     grid_gap_color: tuple[int, int, int] = (0, 0, 0)
@@ -167,6 +168,7 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
             config.outline_ink,
             edge_grid=pre_dither_grid,
             thickness=config.outline_thickness,
+            close_gaps=config.outline_close_gaps,
         )
 
     output = gridmod.upscale(

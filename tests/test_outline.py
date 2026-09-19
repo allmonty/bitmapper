@@ -218,6 +218,42 @@ def test_thickness_matches_the_dart_port():
     assert out3.reshape(-1).tolist() == EXPECTED_SHARED_THICKNESS_3
 
 
+def test_close_gaps_off_reproduces_every_prior_golden():
+    np.testing.assert_array_equal(
+        apply_outline(_square(), PALETTE, 0.5, close_gaps=False),
+        apply_outline(_square(), PALETTE, 0.5),
+    )
+
+
+def _ring_grid():
+    """7x7, bright everywhere except a dark 3x3 ring (rows/cols 2-4)
+    around a bright center cell (3,3): a single-cell gap in an otherwise
+    fully-enclosed dark ring."""
+    n = 7
+    g = np.full((n, n, 3), WHITE, dtype=np.uint8)
+    for y in range(2, 5):
+        for x in range(2, 5):
+            if not (x == 3 and y == 3):
+                g[y, x] = BLACK
+    return g
+
+
+def test_close_gaps_bridges_a_gap_fully_enclosed_by_inked_cells():
+    palette = np.array([WHITE, BLACK], dtype=np.uint8)
+    without_close = apply_outline(_ring_grid(), palette, 0.5, method="brightness")
+    with_close = apply_outline(_ring_grid(), palette, 0.5, method="brightness", close_gaps=True)
+    assert tuple(without_close[3, 3]) == WHITE, "the ring has a 1-cell gap at its centre"
+    assert tuple(with_close[3, 3]) == BLACK, "closing bridges a fully-enclosed gap"
+
+
+def test_close_gaps_matches_the_dart_port():
+    # Shared expected values with bitmapper-app/packages/bitmapper_core/test/outline_test.dart.
+    grid = (np.arange(6 * 5 * 3) * 37 % 256).astype(np.uint8).reshape(5, 6, 3)
+    palette = np.array([(200, 30, 30), (5, 60, 90), (240, 240, 240), (12, 40, 20)], dtype=np.uint8)
+    out = apply_outline(grid, palette, 0.35, method="brightness", close_gaps=True)
+    assert out.reshape(-1).tolist() == EXPECTED_SHARED_CLOSE_GAPS
+
+
 def test_matches_the_dart_port():
     # Shared expected values with bitmapper-app/packages/bitmapper_core/test/outline_test.dart.
     grid = (np.arange(6 * 5 * 3) * 37 % 256).astype(np.uint8).reshape(5, 6, 3)
@@ -248,3 +284,4 @@ EXPECTED_SHARED_SOBEL_METHOD = [12, 40, 20, 111, 148, 185, 222, 3, 40, 77, 114, 
 EXPECTED_SHARED_SHADED_INK = [12, 40, 20, 111, 148, 185, 222, 3, 40, 77, 114, 151, 188, 225, 6, 12, 40, 20, 154, 191, 228, 12, 40, 20, 120, 157, 194, 231, 12, 49, 86, 123, 160, 197, 234, 15, 5, 60, 90, 163, 200, 237, 12, 40, 20, 129, 166, 203, 240, 21, 58, 95, 132, 169, 206, 243, 24, 5, 60, 90, 172, 209, 246, 12, 40, 20, 138, 175, 212, 249, 30, 67, 104, 141, 178, 215, 252, 33, 5, 60, 90, 181, 218, 255, 12, 40, 20, 147, 184, 221]
 EXPECTED_SHARED_THICKNESS_2 = [12, 40, 20, 12, 40, 20, 222, 3, 40, 77, 114, 151, 12, 40, 20, 12, 40, 20, 12, 40, 20, 9, 46, 83, 120, 157, 194, 231, 12, 49, 86, 123, 160, 12, 40, 20, 52, 89, 126, 163, 200, 237, 18, 55, 92, 129, 166, 203, 240, 21, 58, 95, 132, 169, 206, 243, 24, 61, 98, 135, 172, 209, 246, 27, 64, 101, 138, 175, 212, 249, 30, 67, 104, 141, 178, 215, 252, 33, 70, 107, 144, 181, 218, 255, 36, 73, 110, 147, 184, 221]
 EXPECTED_SHARED_THICKNESS_3 = [12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 120, 157, 194, 231, 12, 49, 12, 40, 20, 12, 40, 20, 12, 40, 20, 163, 200, 237, 18, 55, 92, 129, 166, 203, 240, 21, 58, 12, 40, 20, 206, 243, 24, 61, 98, 135, 172, 209, 246, 27, 64, 101, 138, 175, 212, 249, 30, 67, 104, 141, 178, 215, 252, 33, 70, 107, 144, 181, 218, 255, 36, 73, 110, 147, 184, 221]
+EXPECTED_SHARED_CLOSE_GAPS = [12, 40, 20, 12, 40, 20, 222, 3, 40, 77, 114, 151, 188, 225, 6, 12, 40, 20, 12, 40, 20, 12, 40, 20, 120, 157, 194, 231, 12, 49, 86, 123, 160, 197, 234, 15, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 240, 21, 58, 95, 132, 169, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 138, 175, 212, 249, 30, 67, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20, 12, 40, 20]
