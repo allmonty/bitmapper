@@ -27,6 +27,10 @@ from .quantize import nearest_index
 METHODS = ("brightness", "color", "sobel")
 INKS = ("darkest", "shaded")
 
+# Line thickness range, in grid cells. 1 is the original one-cell line.
+MIN_OUTLINE_THICKNESS = 1
+MAX_OUTLINE_THICKNESS = 3
+
 
 def list_methods() -> list[str]:
     return list(METHODS)
@@ -94,6 +98,19 @@ def _sobel_mask(grid: np.ndarray, threshold: float) -> np.ndarray:
     return strong & darker
 
 
+def _dilate4(mask: np.ndarray) -> np.ndarray:
+    """Grow ``mask`` by one cell in each of the 4 cardinal directions (a
+    plus shape per step), which tapers more gracefully than 8-neighbour
+    dilation when applied repeatedly for ``apply_outline``'s ``thickness``.
+    """
+    out = mask.copy()
+    out[:, :-1] |= mask[:, 1:]
+    out[:, 1:] |= mask[:, :-1]
+    out[:-1, :] |= mask[1:, :]
+    out[1:, :] |= mask[:-1, :]
+    return out
+
+
 def _shaded_ink(sources: np.ndarray, palette: np.ndarray) -> np.ndarray:
     """For each source color, the palette color closest to it at half
     brightness, falling back to the darkest color when that would be the
@@ -112,6 +129,7 @@ def apply_outline(
     method: str = "brightness",
     ink: str = "darkest",
     edge_grid: np.ndarray | None = None,
+    thickness: int = 1,
 ) -> np.ndarray:
     """Ink the edges of ``grid`` (rows, cols, 3) found by ``method`` with
     colors from ``palette``, using ``ink`` to pick the color. ``strength``
@@ -122,6 +140,10 @@ def apply_outline(
     quantized before dithering as ``edge_grid``, so a dither pattern's
     color noise in flat regions isn't mistaken for real edges, while the
     ink color/placement still reflects the actually rendered pixels.
+
+    ``thickness`` (1..3, ``MIN_OUTLINE_THICKNESS``..``MAX_OUTLINE_THICKNESS``)
+    grows the line by dilating the edge mask one 4-neighbour step per extra
+    cell; 1 (the default) is the original one-cell line.
     """
     if not (0.0 <= strength <= 1.0):
         raise ValueError(f"outline strength must be between 0 and 1, got {strength}")
@@ -129,6 +151,11 @@ def apply_outline(
         raise ValueError(f"invalid outline method: {method!r}")
     if ink not in INKS:
         raise ValueError(f"invalid outline ink: {ink!r}")
+    if not (MIN_OUTLINE_THICKNESS <= thickness <= MAX_OUTLINE_THICKNESS):
+        raise ValueError(
+            f"thickness must be between {MIN_OUTLINE_THICKNESS} and "
+            f"{MAX_OUTLINE_THICKNESS}, got {thickness}"
+        )
     if strength == 0.0 or grid.size == 0:
         return grid
     if edge_grid is None:
@@ -145,6 +172,8 @@ def apply_outline(
         mask = _color_mask(edge_grid, threshold)
     else:
         mask = _sobel_mask(edge_grid, threshold)
+    for _ in range(thickness - 1):
+        mask = _dilate4(mask)
 
     out = grid.copy()
     out[mask] = darkest_color(palette) if ink == "darkest" else _shaded_ink(grid[mask], palette)

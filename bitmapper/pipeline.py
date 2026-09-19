@@ -13,7 +13,7 @@ from . import palettes
 from .dither import apply as apply_dither
 from .dither import list_methods as list_dither_methods
 from .effects import apply_scanlines
-from .outline import apply_outline
+from .outline import MAX_OUTLINE_THICKNESS, MIN_OUTLINE_THICKNESS, apply_outline
 from .outline import list_inks as list_outline_inks
 from .outline import list_methods as list_outline_methods
 from .quantize import nearest_color
@@ -46,6 +46,7 @@ class BitmapFilterConfig:
     outline: float = 0.0  # 0 = off; ink on strong edges (found by outline_method), 1 = most edges
     outline_method: str = "brightness"  # see bitmapper.outline.list_methods()
     outline_ink: str = "darkest"  # see bitmapper.outline.list_inks()
+    outline_thickness: int = 1  # 1-3 grid cells; see outline.MIN/MAX_OUTLINE_THICKNESS
     shade_bands: int = 0  # 0 = off; else 2-8 flat brightness bands (toon shading)
     despeckle: bool = False  # replace isolated cells with their neighbours' color
     grid_gap_color: tuple[int, int, int] = (0, 0, 0)
@@ -74,6 +75,11 @@ class BitmapFilterConfig:
             raise ValueError(f"invalid outline_method: {self.outline_method!r}")
         if self.outline_ink not in list_outline_inks():
             raise ValueError(f"invalid outline_ink: {self.outline_ink!r}")
+        if not (MIN_OUTLINE_THICKNESS <= self.outline_thickness <= MAX_OUTLINE_THICKNESS):
+            raise ValueError(
+                f"outline_thickness must be between {MIN_OUTLINE_THICKNESS} and "
+                f"{MAX_OUTLINE_THICKNESS}, got {self.outline_thickness}"
+            )
         if self.shade_bands != 0 and not (MIN_SHADE_BANDS <= self.shade_bands <= MAX_SHADE_BANDS):
             raise ValueError(
                 f"shade_bands must be 0 or {MIN_SHADE_BANDS}..{MAX_SHADE_BANDS}, got {self.shade_bands}"
@@ -160,6 +166,7 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
             config.outline_method,
             config.outline_ink,
             edge_grid=pre_dither_grid,
+            thickness=config.outline_thickness,
         )
 
     output = gridmod.upscale(
