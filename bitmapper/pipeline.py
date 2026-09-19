@@ -16,6 +16,7 @@ from .effects import apply_scanlines
 from .outline import apply_outline
 from .outline import list_inks as list_outline_inks
 from .outline import list_methods as list_outline_methods
+from .quantize import nearest_color
 from .toon import MAX_SHADE_BANDS, MIN_SHADE_BANDS, apply_shade_bands, despeckle
 
 MIN_BIT_DEPTH = 1
@@ -140,17 +141,25 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
     grid_colors = apply_shade_bands(grid_colors, config.shade_bands)
 
     palette = _resolve_palette(grid_colors, config)
+    pre_dither_grid = None
     if palette is None:
         palette = np.unique(grid_colors.reshape(-1, 3), axis=0)
         quantized_grid = grid_colors
     else:
+        if config.outline > 0.0:
+            pre_dither_grid, _ = nearest_color(grid_colors, palette)
         quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
 
     if config.despeckle:
         quantized_grid = despeckle(quantized_grid)
     if config.outline > 0.0:
         quantized_grid = apply_outline(
-            quantized_grid, palette, config.outline, config.outline_method, config.outline_ink
+            quantized_grid,
+            palette,
+            config.outline,
+            config.outline_method,
+            config.outline_ink,
+            edge_grid=pre_dither_grid,
         )
 
     output = gridmod.upscale(

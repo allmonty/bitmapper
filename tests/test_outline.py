@@ -1,8 +1,10 @@
 import numpy as np
 import pytest
 
+from bitmapper.dither import apply as apply_dither
 from bitmapper.outline import apply_outline, darkest_color, list_inks, list_methods, outline_threshold
 from bitmapper.pipeline import BitmapFilterConfig, apply_bitmap_filter
+from bitmapper.quantize import nearest_color
 from conftest import random_image
 
 GRAY, WHITE, BLACK = (128, 128, 128), (255, 255, 255), (0, 0, 0)
@@ -102,13 +104,65 @@ def test_shaded_ink_uses_a_half_brightness_palette_match():
     assert (out[1, 2] == (64, 64, 64)).all()
 
 
-@pytest.mark.parametrize("mode", ["auto", "fixed", "true_color"])
+def test_omitting_edge_grid_equals_passing_the_same_grid():
+    grid = _square()
+    np.testing.assert_array_equal(
+        apply_outline(grid, PALETTE, 0.5, method="sobel", edge_grid=grid),
+        apply_outline(grid, PALETTE, 0.5, method="sobel"),
+    )
+
+
+def test_a_dither_boundary_invisible_in_edge_grid_is_not_inked():
+    # The middle cell's final color is darker than its neighbours (as
+    # dither noise would leave it in a flat white region), but its
+    # pre-dither mapping agrees with them: it should only be inked
+    # (darkened further, to the palette's darkest color) without edge_grid.
+    final_grid = np.array([[WHITE, GRAY, WHITE]], dtype=np.uint8)
+    pre_dither = np.array([[WHITE, WHITE, WHITE]], dtype=np.uint8)
+    without_edge_grid = apply_outline(final_grid, PALETTE, 0.9, method="brightness")
+    with_edge_grid = apply_outline(
+        final_grid, PALETTE, 0.9, method="brightness", edge_grid=pre_dither
+    )
+    assert not (without_edge_grid[0, 1] == GRAY).all(), "sees a real jump and inks it"
+    assert (with_edge_grid[0, 1] == GRAY).all(), "pre-dither, all three cells agree"
+
+
+def test_rejects_an_edge_grid_of_a_different_shape():
+    with pytest.raises(ValueError):
+        apply_outline(_square(), PALETTE, 0.5, edge_grid=np.zeros((1, 1, 3), dtype=np.uint8))
+
+
+def test_detects_fewer_edges_from_dither_noise_than_from_the_final_grid(gradient_image):
+    # A smooth gradient dithered onto a small palette: Floyd-Steinberg
+    # scatters color noise across the whole gradient, which the final grid
+    # alone can't tell apart from a real edge. The pre-dither grid has far
+    # fewer real edges (only at the palette's band boundaries).
+    gray4 = np.array([(0, 0, 0), (85, 85, 85), (170, 170, 170), (255, 255, 255)], dtype=np.uint8)
+    dithered = apply_dither(gradient_image, gray4, "floyd_steinberg")
+    pre_dither, _ = nearest_color(gradient_image, gray4)
+
+    def inked_count(out, original):
+        return int((out != original).any(axis=-1).sum())
+
+    without_edge_grid = apply_outline(dithered, gray4, 1.0, method="sobel")
+    with_edge_grid = apply_outline(dithered, gray4, 1.0, method="sobel", edge_grid=pre_dither)
+    noisy_count = inked_count(without_edge_grid, dithered)
+    clean_count = inked_count(with_edge_grid, dithered)
+    assert clean_count < noisy_count
+    # Empirically ~35-40% fewer across several dither methods; leave
+    # headroom so the test isn't brittle to small algorithm tweaks.
+    assert clean_count < round(noisy_count * 0.75)
+
+
+@pytest.mark.parametrize("mode", ["auto", "fixed", "true_color", "dithered"])
 def test_pipeline_output_stays_within_the_palette(mode):
     kwargs = dict(output_size=(40, 40), grid_size=(10, 10), outline=0.6)
     if mode == "fixed":
         kwargs.update(palette_mode="fixed", fixed_palette="pico8", bit_depth=4)
     elif mode == "true_color":
         kwargs.update(bit_depth=24)
+    elif mode == "dithered":
+        kwargs.update(bit_depth=3, dither="floyd_steinberg", outline_method="sobel")
     else:
         kwargs.update(bit_depth=3)
     result = apply_bitmap_filter(random_image(), BitmapFilterConfig(**kwargs))

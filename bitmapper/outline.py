@@ -111,10 +111,18 @@ def apply_outline(
     strength: float,
     method: str = "brightness",
     ink: str = "darkest",
+    edge_grid: np.ndarray | None = None,
 ) -> np.ndarray:
     """Ink the edges of ``grid`` (rows, cols, 3) found by ``method`` with
     colors from ``palette``, using ``ink`` to pick the color. ``strength``
-    0 is off; 1 outlines the faintest edges."""
+    0 is off; 1 outlines the faintest edges.
+
+    Edges are detected on ``edge_grid`` (defaulting to ``grid`` itself) but
+    ink is always painted onto ``grid``. The pipeline passes the grid
+    quantized before dithering as ``edge_grid``, so a dither pattern's
+    color noise in flat regions isn't mistaken for real edges, while the
+    ink color/placement still reflects the actually rendered pixels.
+    """
     if not (0.0 <= strength <= 1.0):
         raise ValueError(f"outline strength must be between 0 and 1, got {strength}")
     if method not in METHODS:
@@ -123,14 +131,20 @@ def apply_outline(
         raise ValueError(f"invalid outline ink: {ink!r}")
     if strength == 0.0 or grid.size == 0:
         return grid
+    if edge_grid is None:
+        edge_grid = grid
+    elif edge_grid.shape != grid.shape:
+        raise ValueError(
+            f"edge_grid shape {edge_grid.shape} doesn't match grid shape {grid.shape}"
+        )
 
     threshold = outline_threshold(strength)
     if method == "brightness":
-        mask = _brightness_mask(grid, threshold)
+        mask = _brightness_mask(edge_grid, threshold)
     elif method == "color":
-        mask = _color_mask(grid, threshold)
+        mask = _color_mask(edge_grid, threshold)
     else:
-        mask = _sobel_mask(grid, threshold)
+        mask = _sobel_mask(edge_grid, threshold)
 
     out = grid.copy()
     out[mask] = darkest_color(palette) if ink == "darkest" else _shaded_ink(grid[mask], palette)
