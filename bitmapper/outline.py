@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .color import luminance
 from .quantize import nearest_index
 
 METHODS = ("brightness", "color", "sobel")
@@ -35,13 +36,6 @@ def list_inks() -> list[str]:
     return list(INKS)
 
 
-def _luminance(colors: np.ndarray) -> np.ndarray:
-    """Rec. 601 luma, as ``(r*0.299 + g*0.587) + b*0.114`` in float64 (the
-    Dart port computes it in the same order, so results match exactly)."""
-    c = colors.astype(np.float64)
-    return c[..., 0] * 0.299 + c[..., 1] * 0.587 + c[..., 2] * 0.114
-
-
 def outline_threshold(strength: float) -> float:
     """Edge threshold: 128 at strength 0+, down to 16 at strength 1
     (stronger = more edges outlined). A brightness step for ``brightness``
@@ -51,7 +45,7 @@ def outline_threshold(strength: float) -> float:
 
 def darkest_color(palette: np.ndarray) -> np.ndarray:
     """The palette entry with the lowest luminance (first one on ties)."""
-    return palette[int(np.argmin(_luminance(palette)))]
+    return palette[int(np.argmin(luminance(palette)))]
 
 
 def _squared_distance(a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -61,7 +55,7 @@ def _squared_distance(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def _brightness_mask(grid: np.ndarray, threshold: float) -> np.ndarray:
-    lum = _luminance(grid)
+    lum = luminance(grid)
     mask = np.zeros(lum.shape, dtype=bool)
     # Each neighbour direction: is the neighbour brighter by more than threshold?
     mask[:, :-1] |= lum[:, 1:] - lum[:, :-1] > threshold   # right
@@ -72,7 +66,7 @@ def _brightness_mask(grid: np.ndarray, threshold: float) -> np.ndarray:
 
 
 def _color_mask(grid: np.ndarray, threshold: float) -> np.ndarray:
-    lum = _luminance(grid)
+    lum = luminance(grid)
     limit = 3.0 * threshold * threshold
     mask = np.zeros(lum.shape, dtype=bool)
     # Horizontal pairs (a = left, b = right), then vertical (a = above, b = below).
@@ -86,7 +80,7 @@ def _color_mask(grid: np.ndarray, threshold: float) -> np.ndarray:
 
 
 def _sobel_mask(grid: np.ndarray, threshold: float) -> np.ndarray:
-    lum = np.pad(_luminance(grid), 1, mode="edge")
+    lum = np.pad(luminance(grid), 1, mode="edge")
     tl, t, tr = lum[:-2, :-2], lum[:-2, 1:-1], lum[:-2, 2:]
     ml, mc, mr = lum[1:-1, :-2], lum[1:-1, 1:-1], lum[1:-1, 2:]
     bl, b, br = lum[2:, :-2], lum[2:, 1:-1], lum[2:, 2:]

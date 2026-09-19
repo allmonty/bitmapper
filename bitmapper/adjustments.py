@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-_LUMA_WEIGHTS = np.array([0.299, 0.587, 0.114])
+from .color import luminance
 
 
 def adjust_contrast(image: np.ndarray, amount: float) -> np.ndarray:
@@ -24,7 +24,7 @@ def adjust_saturation(image: np.ndarray, amount: float) -> np.ndarray:
     if amount < 0:
         raise ValueError(f"saturation amount must be >= 0, got {amount}")
     img = image.astype(np.float64)
-    luma = img[..., :3] @ _LUMA_WEIGHTS
+    luma = luminance(img[..., :3])
     gray = np.stack([luma, luma, luma], axis=-1)
     out = gray + (img - gray) * amount
     return np.clip(out, 0, 255).astype(np.uint8)

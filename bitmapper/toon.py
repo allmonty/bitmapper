@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .outline import _luminance
+from .color import luminance
 
 MIN_SHADE_BANDS = 2
 MAX_SHADE_BANDS = 8
@@ -38,7 +38,7 @@ def apply_shade_bands(grid: np.ndarray, bands: int) -> np.ndarray:
         raise ValueError(
             f"shade bands must be 0 (off) or {MIN_SHADE_BANDS}..{MAX_SHADE_BANDS}, got {bands}"
         )
-    luma = _luminance(grid)
+    luma = luminance(grid)
     band = np.minimum(bands - 1, np.floor(luma * bands / 256.0))
     target = (band + 0.5) * 255.0 / bands
     safe_luma = np.where(luma > 0, luma, 1.0)
