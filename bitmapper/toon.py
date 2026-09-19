@@ -73,6 +73,9 @@ def despeckle(grid: np.ndarray) -> np.ndarray:
                         order.append(c)
                     counts[c] += 1
             if isolated and order:
-                best = max(order, key=lambda c: (counts[c], -order.index(c)))
+                best = order[0]
+                for c in order[1:]:
+                    if counts[c] > counts[best]:
+                        best = c
                 out[y, x] = ((best >> 16) & 255, (best >> 8) & 255, best & 255)
     return out
