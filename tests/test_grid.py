@@ -100,3 +100,72 @@ def test_downsample_then_upscale_round_trip_is_blocky():
         for j in range(0, 20, 5):
             block = out[i : i + 5, j : j + 5]
             assert (block == block[0, 0]).all()
+
+
+# --- Block splitting ------------------------------------------------------
+# These expected values are shared with the Dart port's grid tests
+# (bitmapper-app/packages/bitmapper_core/test/grid_test.dart), so the two
+# implementations stay byte-comparable.
+
+from bitmapper.grid import _splits  # noqa: E402
+
+
+def _sizes(length, n):
+    return [len(part) for part in _splits(length, n)]
+
+
+def test_splits_spread_the_remainder_evenly():
+    # np.array_split would give [15, 15, 14, 14, 14, 14, 14].
+    assert _sizes(100, 7) == [14, 14, 14, 15, 14, 14, 15]
+    assert _sizes(10, 5) == [2, 2, 2, 2, 2]
+
+
+def test_splits_sizes_differ_by_one_and_boundaries_stay_close():
+    for length, n in [(1024, 120), (1024, 300), (4000, 120), (768, 97), (5, 3)]:
+        parts = _splits(length, n)
+        sizes = [len(p) for p in parts]
+        assert sum(sizes) == length
+        assert max(sizes) - min(sizes) <= 1
+        # Consecutive, covering range(length) in order.
+        np.testing.assert_array_equal(np.concatenate(parts), np.arange(length))
+        for i, part in enumerate(parts):
+            if len(part):
+                assert abs(part[0] - i * length / n) < 1
+
+
+def test_features_keep_their_position_at_any_column_count():
+    # Dark left of x = 768 (three quarters of 1024), light to the right.
+    img = np.zeros((8, 1024, 3), dtype=np.uint8)
+    img[:, 768:] = 255
+    for cols in [60, 97, 120, 200, 300, 512]:
+        grid = downsample(img, grid_size=(cols, 1), mode="average")
+        first_light = int(np.argmax(grid[0, :, 0] > 127))
+        assert abs(first_light - cols * 0.75) <= 1, cols
+
+
+def _ramp_7x5():
+    return (np.arange(5 * 7 * 3) * 3 % 256).astype(np.uint8).reshape(5, 7, 3)
+
+
+def test_downsample_uneven_blocks_match_the_dart_port():
+    avg = downsample(_ramp_7x5(), grid_size=(3, 2), mode="average")
+    assert avg.reshape(-1).tolist() == [
+        36, 39, 42, 54, 57, 60, 76, 79, 82, 150, 153, 114, 126, 129, 132, 148, 151, 154,
+    ]
+    near = downsample(_ramp_7x5(), grid_size=(3, 2), mode="nearest")
+    assert near.reshape(-1).tolist() == [
+        72, 75, 78, 90, 93, 96, 108, 111, 114, 198, 201, 204, 216, 219, 222, 234, 237, 240,
+    ]
+
+
+def test_upscale_uneven_gutters_match_the_dart_port():
+    grid = np.array(
+        [[[10, 20, 30], [40, 50, 60]], [[70, 80, 90], [100, 110, 120]]], dtype=np.uint8
+    )
+    out = upscale(grid, (5, 4), gap_px=1, gap_color=(255, 0, 0))
+    assert out.reshape(-1).tolist() == [
+        10, 20, 30, 10, 20, 30, 255, 0, 0, 40, 50, 60, 40, 50, 60,
+        10, 20, 30, 10, 20, 30, 255, 0, 0, 40, 50, 60, 40, 50, 60,
+        255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0,
+        70, 80, 90, 70, 80, 90, 255, 0, 0, 100, 110, 120, 100, 110, 120,
+    ]

@@ -74,7 +74,7 @@ Ordered roughly as they should be built. "Effort" is relative, not absolute.
 | Stage | Source | Effort | Notes |
 |---|---|---|---|
 | Nearest-color lookup | `quantize.py` | Low | The single hottest primitive — everything else calls it. Port `nearest_index` first and keep it the only implementation of "closest palette entry," as in Python. Chunking exists purely to bound NumPy's intermediate allocation; **Dart needs no chunking at all**, since a hand-written loop allocates nothing. Ties must go to the lowest index. |
-| Grid downsample / upscale | `grid.py` | Low | Block boundaries come from `np.array_split` semantics — replicate exactly (§6). Upscale is a block-fill plus optional gutter. |
+| Grid downsample / upscale | `grid.py` | Low | Block boundaries come from `_splits` (evenly spread, *not* `np.array_split`); replicate exactly (§6). Upscale is a block-fill plus optional gutter. |
 | Fixed palettes | `palettes.py` | Low | Pure data. Consider generating the Dart table from Python to avoid transcription typos in ~500 hand-typed RGB triples. |
 | Adjustments | `adjustments.py` | Low | Three elementwise passes. Watch the uint8 cast semantics (§6). |
 | Effects (scanlines) | `effects.py` | Low | Row-wise multiply at canvas resolution. |
@@ -142,12 +142,22 @@ These are verified against the current code, not speculative.
    and, if adopted, change the Python reference in the same commit so the two
    stay golden-comparable. Do not let them silently diverge.
 
-2. **`np.array_split` remainder distribution.** For length `L` into `n`
-   parts, the first `L % n` parts get `L // n + 1` elements and the rest get
-   `L // n` — e.g. `L=100, n=7` → `[15, 15, 14, 14, 14, 14, 14]`. Both
-   `grid.downsample` and `grid.upscale` depend on this, and `upscale`'s gutter
-   positions are derived from the same split so gaps land exactly on block
-   edges. Get this wrong and everything is subtly misaligned.
+2. **Block splitting: evenly spread, not `np.array_split`.** Length `L`
+   splits into `n` parts at bounds `i * L // n`, so sizes differ by at most 1
+   and the larger parts are spread across the image, e.g. `L=100, n=7` →
+   `[14, 14, 14, 15, 14, 14, 15]`. Both `grid.downsample` and `grid.upscale`
+   depend on this, and `upscale`'s gutter positions come from the same split
+   so gaps land exactly on block edges. Get this wrong and everything is
+   subtly misaligned.
+
+   *Resolved:* this used to be `np.array_split`, which gives every leftover
+   element to the first parts. That squeezes the start of the image into its
+   cells and stretches the rest, e.g. 1024 px in 120 columns → 64 cells of
+   9 px, then 56 of 8. It showed as visible "stretched to the right and
+   bottom" distortion in the Dart app, which downsamples straight from the
+   source (§6.1). Python hid it because the default canvas (2000) divides by
+   the default grid (200). Both codebases changed together, and
+   `tests/test_grid.py` shares expected values with the Dart grid tests.
 
 3. **uint8 casts truncate, they don't round.** `np.clip(x, 0, 255).astype(np.uint8)`
    turns `250.7` into `250`, not `251`. Dart's `double.toInt()` also truncates

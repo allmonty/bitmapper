@@ -11,7 +11,18 @@ import numpy as np
 
 
 def _splits(length: int, n: int) -> list[np.ndarray]:
-    return np.array_split(np.arange(length), n)
+    """Split ``range(length)`` into ``n`` consecutive parts whose sizes differ
+    by at most 1, with the larger parts spread evenly: part ``i`` covers
+    ``[i * length // n, (i + 1) * length // n)``.
+
+    Deliberately not ``np.array_split``, which gives every leftover element to
+    the first parts: that squeezes the start of an image into its cells and
+    stretches the rest (e.g. 1024 px in 120 columns: 64 cells of 9 px, then 56
+    of 8), a visible distortion that shifts with the grid size. The Dart port
+    (``splitSizes``) uses the same formula so the two stay comparable.
+    """
+    bounds = [i * length // n for i in range(n + 1)]
+    return [np.arange(bounds[i], bounds[i + 1]) for i in range(n)]
 
 
 def downsample(image: np.ndarray, grid_size: tuple[int, int], mode: str = "average") -> np.ndarray:
