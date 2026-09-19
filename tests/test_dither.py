@@ -2,7 +2,9 @@ import numpy as np
 import pytest
 
 from bitmapper.dither import (
+    _CLUSTERED_DOT,
     _DIFFUSION_KERNELS,
+    _SERPENTINE_METHODS,
     apply,
     error_diffusion,
     list_methods,
@@ -17,8 +19,15 @@ PALETTE = np.array([[0, 0, 0], [255, 255, 255]], dtype=np.uint8)
 # Read from the kernel table rather than a hardcoded list, so a newly
 # registered kernel is covered by these tests automatically.
 DIFFUSION_METHODS = sorted(_DIFFUSION_KERNELS)
-ORDERED_METHODS = ["ordered", "ordered_2x2", "ordered_8x8"]
-ALL_METHODS = DIFFUSION_METHODS + ORDERED_METHODS + ["random"]
+ORDERED_METHODS = [
+    "ordered",
+    "ordered_2x2",
+    "ordered_8x8",
+    "ordered_16x16",
+    "clustered_dot",
+    "interleaved_gradient_noise",
+]
+ALL_METHODS = DIFFUSION_METHODS + sorted(_SERPENTINE_METHODS) + ORDERED_METHODS + ["random"]
 
 
 def _assert_only_palette_colors(image, palette):
@@ -128,3 +137,27 @@ def test_full_strength_matches_default(gradient_image, method):
 def test_apply_rejects_negative_strength(gradient_image):
     with pytest.raises(ValueError):
         apply(gradient_image, PALETTE, "floyd_steinberg", strength=-0.1)
+
+
+def test_serpentine_differs_from_raster_order(gradient_image):
+    raster = apply(gradient_image, PALETTE, "floyd_steinberg")
+    serpentine = apply(gradient_image, PALETTE, "floyd_steinberg_serpentine")
+    assert not np.array_equal(raster, serpentine)
+    # The first row is scanned left-to-right in both.
+    np.testing.assert_array_equal(raster[0], serpentine[0])
+
+
+def test_clustered_dot_matrix_is_a_permutation():
+    assert sorted(_CLUSTERED_DOT.astype(int).reshape(-1).tolist()) == list(range(16))
+
+
+def test_new_ordered_methods_differ_from_bayer(gradient_image):
+    bayer = apply(gradient_image, PALETTE, "ordered")
+    for method in ["ordered_16x16", "clustered_dot", "interleaved_gradient_noise"]:
+        assert not np.array_equal(apply(gradient_image, PALETTE, method), bayer), method
+
+
+def test_interleaved_gradient_noise_is_deterministic(gradient_image):
+    a = apply(gradient_image, PALETTE, "interleaved_gradient_noise")
+    b = apply(gradient_image, PALETTE, "interleaved_gradient_noise")
+    np.testing.assert_array_equal(a, b)

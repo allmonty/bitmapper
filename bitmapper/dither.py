@@ -60,7 +60,29 @@ _DIFFUSION_KERNELS: dict[str, tuple[list[tuple[int, int, float]], float]] = {
         ],
         32,
     ),
+    # Frankie Sierra's two-row variant: between Sierra and Sierra Lite.
+    "sierra_two_row": (
+        [
+            (1, 0, 4), (2, 0, 3),
+            (-2, 1, 1), (-1, 1, 2), (0, 1, 3), (1, 1, 2), (2, 1, 1),
+        ],
+        16,
+    ),
+    # A cheap three-tap approximation of Floyd-Steinberg.
+    "false_floyd_steinberg": (
+        [(1, 0, 3), (0, 1, 3), (1, 1, 2)],
+        8,
+    ),
+    # All the error to the next pixel on the row: streaky, very lo-fi.
+    "simple": (
+        [(1, 0, 1)],
+        1,
+    ),
 }
+
+# Floyd-Steinberg scanned serpentine (alternate rows right-to-left, taps
+# mirrored), which breaks up the diagonal "worm" artifacts of raster order.
+_SERPENTINE_METHODS = {"floyd_steinberg_serpentine": "floyd_steinberg"}
 
 
 def _error_diffusion(
@@ -69,6 +91,7 @@ def _error_diffusion(
     kernel: list[tuple[int, int, float]],
     divisor: float,
     strength: float = 1.0,
+    serpentine: bool = False,
 ) -> np.ndarray:
     img = image.astype(np.float64).copy()
     pal = palette.astype(np.float64)
@@ -78,7 +101,8 @@ def _error_diffusion(
     scaled_kernel = [(dx, dy, weight * strength / divisor) for dx, dy, weight in kernel]
 
     for y in range(h):
-        for x in range(w):
+        reverse = serpentine and y % 2 == 1
+        for x in (range(w - 1, -1, -1) if reverse else range(w)):
             old = img[y, x].copy()
             dists = ((pal - old) ** 2).sum(axis=1)
             new = pal[int(dists.argmin())]
@@ -86,14 +110,16 @@ def _error_diffusion(
             error = old - new
 
             for dx, dy, scaled_weight in scaled_kernel:
-                nx, ny = x + dx, y + dy
+                nx, ny = (x - dx if reverse else x + dx), y + dy
                 if 0 <= nx < w and 0 <= ny < h:
                     img[ny, nx] += error * scaled_weight
 
     return np.clip(img, 0, 255).astype(np.uint8)
 
 
-def error_diffusion(image: np.ndarray, palette: np.ndarray, method: str, strength: float = 1.0) -> np.ndarray:
+def error_diffusion(
+    image: np.ndarray, palette: np.ndarray, method: str, strength: float = 1.0, serpentine: bool = False
+) -> np.ndarray:
     """Error-diffusion dithering onto ``palette`` using the named kernel
     from ``_DIFFUSION_KERNELS`` (floyd_steinberg, atkinson, stucki, ...).
     """
@@ -101,7 +127,7 @@ def error_diffusion(image: np.ndarray, palette: np.ndarray, method: str, strengt
         kernel, divisor = _DIFFUSION_KERNELS[method]
     except KeyError:
         raise ValueError(f"unknown error-diffusion kernel: {method!r}") from None
-    return _error_diffusion(image, palette, kernel, divisor, strength)
+    return _error_diffusion(image, palette, kernel, divisor, strength, serpentine)
 
 
 def _bayer_matrix(size: int) -> np.ndarray:
@@ -149,6 +175,45 @@ def ordered_8x8(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -
     return ordered(image, palette, matrix_size=8, strength=strength)
 
 
+def ordered_16x16(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
+    return ordered(image, palette, matrix_size=16, strength=strength)
+
+
+# 4x4 clustered-dot threshold map: dots grow from the centre of each tile,
+# like a printed halftone screen.
+_CLUSTERED_DOT = np.array(
+    [
+        [12, 5, 6, 13],
+        [4, 0, 1, 7],
+        [11, 3, 2, 8],
+        [15, 10, 9, 14],
+    ],
+    dtype=np.float64,
+)
+
+
+def clustered_dot(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
+    """Halftone-style ordered dithering with a clustered-dot threshold map."""
+    return _ordered_with_matrix(image, palette, _CLUSTERED_DOT, strength)
+
+
+def interleaved_gradient_noise(image: np.ndarray, palette: np.ndarray, strength: float = 1.0) -> np.ndarray:
+    """Ordered-style dithering with Jorge Jimenez's interleaved gradient
+    noise: a deterministic formula whose pattern looks close to blue noise
+    (no visible grid, finer grain than Bayer)."""
+    h, w = image.shape[:2]
+    y, x = np.mgrid[0:h, 0:w].astype(np.float64)
+    inner = 0.06711056 * x + 0.00583715 * y
+    outer = 52.9829189 * (inner - np.floor(inner))
+    threshold = outer - np.floor(outer) - 0.5
+
+    n_colors = max(len(palette), 2)
+    step = 255.0 / (n_colors ** (1 / 3))
+    perturbed = image.astype(np.float64) + threshold[..., None] * step * strength
+    quantized, _ = nearest_color(np.clip(perturbed, 0, 255), palette)
+    return quantized
+
+
 def random_dither(
     image: np.ndarray, palette: np.ndarray, strength: float = 1.0, seed: int | None = None
 ) -> np.ndarray:
@@ -171,9 +236,16 @@ def random_dither(
 # method (and to pick up the parametrized tests that read list_methods()).
 _METHODS = {
     **{name: partial(error_diffusion, method=name) for name in _DIFFUSION_KERNELS},
+    **{
+        name: partial(error_diffusion, method=base, serpentine=True)
+        for name, base in _SERPENTINE_METHODS.items()
+    },
     "ordered": ordered,
     "ordered_2x2": ordered_2x2,
     "ordered_8x8": ordered_8x8,
+    "ordered_16x16": ordered_16x16,
+    "clustered_dot": clustered_dot,
+    "interleaved_gradient_noise": interleaved_gradient_noise,
     "random": random_dither,
 }
 

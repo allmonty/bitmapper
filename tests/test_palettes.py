@@ -18,6 +18,19 @@ EXPECTED_SIZES = {
     "monochrome_green": 4,
     "monochrome_amber": 4,
     "sepia": 32,
+    "cga_palette0": 4,
+    "windows16": 16,
+    "mac16": 16,
+    "gameboy_pocket": 4,
+    "virtualboy": 4,
+    "amstrad_cpc": 27,
+    "master_system": 64,
+    "db16": 16,
+    "sweetie16": 16,
+    "endesga32": 32,
+    "one_bit": 2,
+    "grayscale16": 16,
+    "thermal": 16,
 }
 
 
@@ -66,3 +79,16 @@ def test_subsample_rejects_non_positive_n_colors():
     palette = get_palette("cga")
     with pytest.raises(ValueError):
         subsample(palette, 0)
+
+
+def test_generated_palettes():
+    cpc = get_palette("amstrad_cpc")
+    assert len({tuple(c) for c in cpc.tolist()}) == 27
+    assert set(np.unique(cpc).tolist()) == {0, 128, 255}
+    sms = get_palette("master_system")
+    assert set(np.unique(sms).tolist()) == {0, 85, 170, 255}
+    gray = get_palette("grayscale16")
+    assert gray[0].tolist() == [0, 0, 0] and gray[-1].tolist() == [255, 255, 255]
+    assert all(r == g == b for r, g, b in gray.tolist())
+    thermal = get_palette("thermal")
+    assert thermal[0].tolist() == [0, 0, 0] and thermal[-1].tolist() == [255, 255, 255]

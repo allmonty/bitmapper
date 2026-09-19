@@ -63,24 +63,48 @@ colors) at any depth.
 
 ### Palettes
 
-`list_palettes()` returns the curated fixed palettes: `cga`, `ega`,
-`gameboy`, `vga256`, `c64`, `zxspectrum`, `pico8`, `nes`, `appleii`, `msx`,
-`teletext`, `monochrome_green`, `monochrome_amber`, `sepia`. Pass
+`list_palettes()` returns the curated fixed palettes:
+
+- **Systems:** `cga`, `cga_palette0`, `ega`, `vga256`, `windows16`, `mac16`,
+  `gameboy`, `gameboy_pocket`, `virtualboy`, `nes`, `master_system`,
+  `c64`, `zxspectrum`, `amstrad_cpc`, `appleii`, `msx`, `teletext`,
+  `pico8`.
+- **Pixel-art palettes:** `db16` (DawnBringer), `sweetie16` (TIC-80),
+  `endesga32`.
+- **Tones:** `monochrome_green`, `monochrome_amber`, `one_bit`,
+  `grayscale16`, `sepia`, `thermal`.
+
+Pass
 `custom_palette=[(r, g, b), ...]` with `palette_mode="custom"` for your own.
 
 ### Dithering
 
-`bitmapper.dither.list_methods()` returns `none` plus 7 error-diffusion
-methods (`floyd_steinberg`, `atkinson`, `jarvis_judice_ninke`, `stucki`,
-`sierra`, `sierra_lite`, `burkes`), 3 ordered/Bayer variants (`ordered`,
-`ordered_2x2`, `ordered_8x8`), and `random` (white-noise). `dither_strength`
+`bitmapper.dither.list_methods()` returns `none` plus:
+
+- **Error diffusion (10):** `floyd_steinberg`, `atkinson`,
+  `jarvis_judice_ninke`, `stucki`, `sierra`, `sierra_two_row`,
+  `sierra_lite`, `burkes`, `false_floyd_steinberg` and `simple`.
+- **Serpentine error diffusion:** `floyd_steinberg_serpentine`, which
+  alternates the scan direction each row to break up diagonal artifacts.
+- **Ordered:** `ordered`, `ordered_2x2`, `ordered_8x8` and `ordered_16x16`
+  (Bayer), plus `clustered_dot` (halftone).
+- **Noise:** `interleaved_gradient_noise` (a deterministic, blue-noise-like
+  grain) and `random` (white noise). `dither_strength`
 blends toward `"none"` without introducing off-palette colors.
 
 ### Presets
 
 `bitmapper.presets.list_presets()` bundles palette/dither/effect/tone combos
-into named looks (`gameboy_camera`, `arcade_cabinet`, `crt_terminal`, `vhs`,
-`sepia_photo`, `newspaper`, `vaporwave`, `pico8_game`):
+into named looks:
+
+- `gameboy_camera`, `gameboy_pocket`, `virtual_boy`
+- `arcade_cabinet`, `crt_terminal`, `vhs`
+- `sepia_photo`, `newspaper`, `comic_halftone`, `vaporwave`
+- `pico8_game`, `tic80`, `dawnbringer`, `endesga_art`
+- `windows98`, `classic_mac`, `macpaint`
+- `amstrad_cpc`, `master_system`
+
+For example:
 
 ```python
 from bitmapper import get_preset, apply_bitmap_filter

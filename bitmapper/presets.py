@@ -43,6 +43,52 @@ _PRESETS: dict[str, dict] = {
         palette_mode="fixed", fixed_palette="pico8", bit_depth=4,
         dither="none", grid_gap_px=1,
     ),
+    "windows98": dict(
+        palette_mode="fixed", fixed_palette="windows16", bit_depth=4,
+        dither="ordered",
+    ),
+    # Bill Atkinson's dither was the Mac's own.
+    "classic_mac": dict(
+        palette_mode="fixed", fixed_palette="mac16", bit_depth=4,
+        dither="atkinson",
+    ),
+    "macpaint": dict(
+        palette_mode="fixed", fixed_palette="one_bit", bit_depth=1,
+        dither="atkinson", contrast=1.1,
+    ),
+    "comic_halftone": dict(
+        palette_mode="custom",
+        custom_palette=[(255, 255, 255), (0, 255, 255), (255, 0, 255), (255, 255, 0), (0, 0, 0)],
+        dither="clustered_dot", dither_strength=0.5, saturation=1.3, gamma=1.2,
+    ),
+    "virtual_boy": dict(
+        palette_mode="fixed", fixed_palette="virtualboy", bit_depth=2,
+        dither="ordered", saturation=0.0,
+    ),
+    "gameboy_pocket": dict(
+        palette_mode="fixed", fixed_palette="gameboy_pocket", bit_depth=2,
+        dither="ordered",
+    ),
+    "amstrad_cpc": dict(
+        palette_mode="fixed", fixed_palette="amstrad_cpc", bit_depth=5,
+        dither="floyd_steinberg", scanlines=0.2,
+    ),
+    "master_system": dict(
+        palette_mode="fixed", fixed_palette="master_system", bit_depth=6,
+        dither="sierra_lite",
+    ),
+    "tic80": dict(
+        palette_mode="fixed", fixed_palette="sweetie16", bit_depth=4,
+        dither="interleaved_gradient_noise",
+    ),
+    "dawnbringer": dict(
+        palette_mode="fixed", fixed_palette="db16", bit_depth=4,
+        dither="floyd_steinberg_serpentine",
+    ),
+    "endesga_art": dict(
+        palette_mode="fixed", fixed_palette="endesga32", bit_depth=5,
+        dither="interleaved_gradient_noise", saturation=1.1,
+    ),
 }
 
 
