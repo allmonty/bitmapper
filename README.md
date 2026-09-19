@@ -43,6 +43,7 @@ config = BitmapFilterConfig(
     dither_strength=1.0,        # 0 = no dither pattern, 1 = full strength
     scanlines=0.0,               # 0-1, darkens alternate output rows
     grid_gap_px=0,                # gutter width between blocks, in output px
+    outline=0.0,                  # 0-1, sprite-style ink on strong edges (0 = off)
     grid_gap_color=(0, 0, 0),
     contrast=1.0,                # around mid-gray; 0 = flat gray
     saturation=1.0,               # 0 = grayscale
@@ -105,6 +106,7 @@ into named looks:
 - `amstrad_cpc`, `master_system`
 - `pixel_art`, `pixel_art_soft`, `pixel_art_rich`, `pixel_art_earthy`,
   `pixel_art_mono`: flat colors with no dithering, meant for a chunky grid.
+- `pixel_art_sprite`: the same, with ink outlines (see `outline`).
 
 `preset_columns(name)` gives the grid width a preset is designed for (the
 pixel-art ones suggest 48–80), or `None`.

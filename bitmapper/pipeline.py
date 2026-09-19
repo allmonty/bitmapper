@@ -13,6 +13,7 @@ from . import palettes
 from .dither import apply as apply_dither
 from .dither import list_methods as list_dither_methods
 from .effects import apply_scanlines
+from .outline import apply_outline
 
 MIN_BIT_DEPTH = 1
 MAX_BIT_DEPTH = 24  # 2**24 = 16.7M colors: full precision for 8-bit-per-channel RGB
@@ -38,6 +39,7 @@ class BitmapFilterConfig:
     dither_strength: float = 1.0  # 0 = no dithering pattern, 1 = full strength
     scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
     grid_gap_px: int = 0  # gutter width between blocks, in output pixels
+    outline: float = 0.0  # 0 = off; sprite-style ink on strong edges, 1 = most edges
     grid_gap_color: tuple[int, int, int] = (0, 0, 0)
     contrast: float = 1.0  # 1.0 = no-op, >1 boosts, <1 flattens, 0 = flat gray
     saturation: float = 1.0  # 1.0 = no-op, >1 boosts, 0 = grayscale
@@ -58,6 +60,8 @@ class BitmapFilterConfig:
             raise ValueError(f"dither_strength must be >= 0, got {self.dither_strength}")
         if not (0.0 <= self.scanlines <= 1.0):
             raise ValueError(f"scanlines must be between 0 and 1, got {self.scanlines}")
+        if not (0.0 <= self.outline <= 1.0):
+            raise ValueError(f"outline must be between 0 and 1, got {self.outline}")
         if self.grid_gap_px < 0:
             raise ValueError(f"grid_gap_px must be >= 0, got {self.grid_gap_px}")
         if self.contrast < 0:
@@ -125,6 +129,9 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
         quantized_grid = grid_colors
     else:
         quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
+
+    if config.outline > 0.0:
+        quantized_grid = apply_outline(quantized_grid, palette, config.outline)
 
     output = gridmod.upscale(
         quantized_grid, config.output_size, gap_px=config.grid_gap_px, gap_color=config.grid_gap_color

@@ -112,6 +112,11 @@ _PRESETS: dict[str, dict] = {
         palette_mode="fixed", fixed_palette="gameboy", bit_depth=2,
         dither="none", contrast=1.3,
     ),
+    # Pixel art with sprite-style ink outlines on strong edges.
+    "pixel_art_sprite": dict(
+        palette_mode="fixed", fixed_palette="pico8", bit_depth=4,
+        dither="none", contrast=1.15, saturation=1.25, outline=0.4,
+    ),
 }
 
 # Grid width (columns) a preset is designed for. The row count depends on
@@ -123,6 +128,7 @@ _PRESET_COLUMNS: dict[str, int] = {
     "pixel_art_rich": 80,
     "pixel_art_earthy": 64,
     "pixel_art_mono": 48,
+    "pixel_art_sprite": 64,
 }
 
 
