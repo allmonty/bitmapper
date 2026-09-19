@@ -162,6 +162,12 @@ to port to Dart/Flutter later:
   `strength` knob.
 - `adjustments.py` — contrast/saturation/gamma pre-adjustments applied to
   the canvas before quantization.
+- `toon.py` — cel-shading extras applied to the grid: `apply_shade_bands`
+  (flatten luma into 2-8 bands) and `despeckle` (replace isolated cells
+  with their most common neighbour).
+- `outline.py` — sprite-style ink outlines on the quantized grid, with a
+  choice of edge-finding method (`brightness`, `color`, `sobel`) and ink
+  style (`darkest`, `shaded`); see [Outlining](#outlining) above.
 - `effects.py` — post-quantization effects (currently CRT scanlines).
 - `presets.py` — named bundles of the above, layered under caller overrides.
 - `pipeline.py` — `BitmapFilterConfig` + `apply_bitmap_filter`, wiring the

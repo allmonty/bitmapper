@@ -7,6 +7,19 @@ source across 10 modules, 196 tests, no dependencies beyond NumPy and Pillow.
 This is a plan, not a spec — the sequencing and the open decisions at the end
 matter more than the specific file names.
 
+**Status: the port shipped** (`../bitmapper-app/packages/bitmapper_core`) and
+both codebases keep evolving together — see open decision §8.4, resolved
+"yes". The milestones in §7 and the module/test counts above are historical
+(module count has since grown to 12 with `toon.py` and `outline.py`; dither
+now has 19 methods, palettes and presets 27 each). What's still load-bearing
+and current is **§6, the portability gotchas** — every new filter stage on
+either side must respect them (truncate, don't round; evenly-spread splits;
+preserve float operation order; port `_luminance`'s exact term order) and
+should add a byte-exact cross-check test, the way `outline_test.dart` /
+`test_outline.py` and `toon_test.dart` / `test_toon.py` do. See
+`../bitmapper-app/CLAUDE.md` and this repo's `CLAUDE.md` for the current
+architecture.
+
 ## 1. The property that makes this port easy
 
 The expensive stage runs on the **grid**, not the **canvas**.
@@ -238,10 +251,17 @@ Resolve these before or during the port rather than discovering them late:
    the API and makes palettes stable across runs; changes current output.
 3. **Keep `random` dither?** It's the only method needing a cross-language
    PRNG, for the least distinctive result.
-4. **Does the Python reference keep evolving after the port starts?** If yes,
-   the goldens are the contract and both sides must be updated together. If no,
-   freeze it and say so here — a reference implementation that drifts silently
-   is worse than none.
+4. **Does the Python reference keep evolving after the port starts?**
+   **Resolved: yes.** New filter stages (`toon.py`'s shade bands and
+   despeckle, `outline.py`'s ink outlines) were added to both codebases
+   together after the initial port, each with byte-exact shared expected
+   values in both test suites (e.g. `EXPECTED_SHARED*` constants). The
+   goldens/shared-values approach is the contract; a change to one side
+   without the other is a bug. This pairing is a standing project
+   convention (see "Performance and the Dart port" in this repo's
+   `CLAUDE.md`), not a one-time migration step: when asked to add or change
+   a filter feature, change both repos and cover both with tests unless
+   told otherwise.
 5. **Later: move the full-canvas tail to the GPU?** Upscale, grid gap, and
    scanlines are per-pixel independent and run on the largest buffer. If
    exporting large canvases is slow on-device, this is the first thing to try
