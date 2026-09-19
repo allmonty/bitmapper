@@ -103,6 +103,11 @@ into named looks:
 - `pico8_game`, `tic80`, `dawnbringer`, `endesga_art`
 - `windows98`, `classic_mac`, `macpaint`
 - `amstrad_cpc`, `master_system`
+- `pixel_art`, `pixel_art_soft`, `pixel_art_rich`, `pixel_art_earthy`,
+  `pixel_art_mono`: flat colors with no dithering, meant for a chunky grid.
+
+`preset_columns(name)` gives the grid width a preset is designed for (the
+pixel-art ones suggest 48–80), or `None`.
 
 For example:
 

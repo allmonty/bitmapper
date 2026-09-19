@@ -89,11 +89,53 @@ _PRESETS: dict[str, dict] = {
         palette_mode="fixed", fixed_palette="endesga32", bit_depth=5,
         dither="interleaved_gradient_noise", saturation=1.1,
     ),
+    # Pixel-art looks: flat colors (no dithering), curated pixel-art
+    # palettes, a little extra punch, and a suggested chunky grid (see
+    # _PRESET_COLUMNS).
+    "pixel_art": dict(
+        palette_mode="fixed", fixed_palette="pico8", bit_depth=4,
+        dither="none", contrast=1.15, saturation=1.25,
+    ),
+    "pixel_art_soft": dict(
+        palette_mode="fixed", fixed_palette="sweetie16", bit_depth=4,
+        dither="none", saturation=1.1,
+    ),
+    "pixel_art_rich": dict(
+        palette_mode="fixed", fixed_palette="endesga32", bit_depth=5,
+        dither="none", contrast=1.1, saturation=1.15,
+    ),
+    "pixel_art_earthy": dict(
+        palette_mode="fixed", fixed_palette="db16", bit_depth=4,
+        dither="none", contrast=1.1,
+    ),
+    "pixel_art_mono": dict(
+        palette_mode="fixed", fixed_palette="gameboy", bit_depth=2,
+        dither="none", contrast=1.3,
+    ),
+}
+
+# Grid width (columns) a preset is designed for. The row count depends on
+# the image's aspect ratio, so presets suggest columns instead of setting
+# ``grid_size``; callers apply it (or not) when building the config.
+_PRESET_COLUMNS: dict[str, int] = {
+    "pixel_art": 64,
+    "pixel_art_soft": 64,
+    "pixel_art_rich": 80,
+    "pixel_art_earthy": 64,
+    "pixel_art_mono": 48,
 }
 
 
 def list_presets() -> list[str]:
     return sorted(_PRESETS.keys())
+
+
+def preset_columns(name: str) -> int | None:
+    """The grid width preset ``name`` is designed for, or ``None`` if it
+    works at any grid size."""
+    if name not in _PRESETS:
+        raise ValueError(f"unknown preset {name!r}, available: {list_presets()}")
+    return _PRESET_COLUMNS.get(name)
 
 
 def get_preset(name: str, **overrides) -> BitmapFilterConfig:
