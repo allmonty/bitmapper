@@ -14,6 +14,7 @@ from .dither import apply as apply_dither
 from .dither import list_methods as list_dither_methods
 from .effects import apply_scanlines
 from .outline import apply_outline
+from .toon import MAX_SHADE_BANDS, MIN_SHADE_BANDS, apply_shade_bands, despeckle
 
 MIN_BIT_DEPTH = 1
 MAX_BIT_DEPTH = 24  # 2**24 = 16.7M colors: full precision for 8-bit-per-channel RGB
@@ -40,6 +41,8 @@ class BitmapFilterConfig:
     scanlines: float = 0.0  # 0 = off, 1 = alternate rows fully black
     grid_gap_px: int = 0  # gutter width between blocks, in output pixels
     outline: float = 0.0  # 0 = off; sprite-style ink on strong edges, 1 = most edges
+    shade_bands: int = 0  # 0 = off; else 2-8 flat brightness bands (toon shading)
+    despeckle: bool = False  # replace isolated cells with their neighbours' color
     grid_gap_color: tuple[int, int, int] = (0, 0, 0)
     contrast: float = 1.0  # 1.0 = no-op, >1 boosts, <1 flattens, 0 = flat gray
     saturation: float = 1.0  # 1.0 = no-op, >1 boosts, 0 = grayscale
@@ -62,6 +65,10 @@ class BitmapFilterConfig:
             raise ValueError(f"scanlines must be between 0 and 1, got {self.scanlines}")
         if not (0.0 <= self.outline <= 1.0):
             raise ValueError(f"outline must be between 0 and 1, got {self.outline}")
+        if self.shade_bands != 0 and not (MIN_SHADE_BANDS <= self.shade_bands <= MAX_SHADE_BANDS):
+            raise ValueError(
+                f"shade_bands must be 0 or {MIN_SHADE_BANDS}..{MAX_SHADE_BANDS}, got {self.shade_bands}"
+            )
         if self.grid_gap_px < 0:
             raise ValueError(f"grid_gap_px must be >= 0, got {self.grid_gap_px}")
         if self.contrast < 0:
@@ -122,6 +129,7 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
     canvas = _resize_to_canvas(image, config.output_size)
     canvas = adjustments.apply(canvas, config.contrast, config.saturation, config.gamma)
     grid_colors = gridmod.downsample(canvas, config.grid_size, mode=config.block_sampling)
+    grid_colors = apply_shade_bands(grid_colors, config.shade_bands)
 
     palette = _resolve_palette(grid_colors, config)
     if palette is None:
@@ -130,6 +138,8 @@ def apply_bitmap_filter(image: np.ndarray, config: BitmapFilterConfig) -> Filter
     else:
         quantized_grid = apply_dither(grid_colors, palette, config.dither, config.dither_strength)
 
+    if config.despeckle:
+        quantized_grid = despeckle(quantized_grid)
     if config.outline > 0.0:
         quantized_grid = apply_outline(quantized_grid, palette, config.outline)
 

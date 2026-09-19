@@ -117,6 +117,15 @@ _PRESETS: dict[str, dict] = {
         palette_mode="fixed", fixed_palette="pico8", bit_depth=4,
         dither="none", contrast=1.15, saturation=1.25, outline=0.4,
     ),
+    # Cel shading: flat brightness bands, no stray cells, ink outlines.
+    "toon": dict(
+        palette_mode="auto", bit_depth=4, dither="none", saturation=1.3,
+        shade_bands=3, despeckle=True, outline=0.5,
+    ),
+    "toon_pastel": dict(
+        palette_mode="fixed", fixed_palette="sweetie16", bit_depth=4,
+        dither="none", saturation=1.3, shade_bands=4, despeckle=True, outline=0.5,
+    ),
 }
 
 # Grid width (columns) a preset is designed for. The row count depends on
@@ -129,6 +138,8 @@ _PRESET_COLUMNS: dict[str, int] = {
     "pixel_art_earthy": 64,
     "pixel_art_mono": 48,
     "pixel_art_sprite": 64,
+    "toon": 96,
+    "toon_pastel": 96,
 }
 
 
